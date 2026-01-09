@@ -212,6 +212,27 @@ class AlfenModbusHub:
         with self._lock:
             self._client.connect()
 
+    def _ensure_connected(self):
+        """Ensure the modbus client is connected, reconnect if necessary.
+        Must be called while holding self._lock."""
+        try:
+            # Check if socket is open (method may vary by pymodbus version)
+            is_open = getattr(self._client, 'is_socket_open', None)
+            if is_open and not is_open():
+                _LOGGER.debug("Modbus connection lost, reconnecting...")
+                try:
+                    self._client.close()
+                except Exception:
+                    pass  # Ignore errors when closing
+                self._client.connect()
+                # Verify reconnection
+                if is_open and not is_open():
+                    raise ConnectionError("Failed to reconnect to modbus device")
+        except AttributeError:
+            # If is_socket_open doesn't exist, just try to connect
+            # The actual read/write will catch connection errors
+            pass
+
     @property
     def has_socket_2(self):
         """Return true if a meter is available"""
@@ -224,17 +245,53 @@ class AlfenModbusHub:
 
     def read_holding_registers(self, unit, address, count):
         """Read holding registers."""
-        with self._lock:
-            return self._client.read_holding_registers(
-                address=address, count=count, device_id=unit
-            )
+        try:
+            with self._lock:
+                self._ensure_connected()
+                return self._client.read_holding_registers(
+                    address=address, count=count, device_id=unit
+                )
+        except (BrokenPipeError, ConnectionError, OSError) as e:
+            _LOGGER.warning("Connection error during read, attempting reconnect: %s", e)
+            # Try to reconnect once
+            try:
+                with self._lock:
+                    try:
+                        self._client.close()
+                    except Exception:
+                        pass
+                    self._client.connect()
+                    return self._client.read_holding_registers(
+                        address=address, count=count, device_id=unit
+                    )
+            except Exception as retry_error:
+                _LOGGER.error("Failed to reconnect and retry read: %s", retry_error)
+                raise
 
     def write_registers(self, unit, address, payload):
         """Write registers."""
-        with self._lock:
-            return self._client.write_registers(
-                address=address, values=payload, device_id=unit
-            )
+        try:
+            with self._lock:
+                self._ensure_connected()
+                return self._client.write_registers(
+                    address=address, values=payload, device_id=unit
+                )
+        except (BrokenPipeError, ConnectionError, OSError) as e:
+            _LOGGER.warning("Connection error during write, attempting reconnect: %s", e)
+            # Try to reconnect once
+            try:
+                with self._lock:
+                    try:
+                        self._client.close()
+                    except Exception:
+                        pass
+                    self._client.connect()
+                    return self._client.write_registers(
+                        address=address, values=payload, device_id=unit
+                    )
+            except Exception as retry_error:
+                _LOGGER.error("Failed to reconnect and retry write: %s", retry_error)
+                raise
             
     def refresh_max_current(self):
         if int(self.data[VALID_TIME_S+"1"]) < self._refreshInterval+10 or (self.has_socket_2 and int(self.data[VALID_TIME_S+"2"]) < self._refreshInterval+10):
