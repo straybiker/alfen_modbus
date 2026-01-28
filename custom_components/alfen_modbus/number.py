@@ -77,13 +77,11 @@ class AlfenNumber(NumberEntity):
         """Initialize the selector."""
         self._platform_name = platform_name
         self._hub = hub
-        self._device_info = device_info
         self._name = name+str(socket)
         self._socket = socket
         self._key = key+str(socket)
         self._register = register
         self._fmt = fmt
-        self._attr_device_info = device_info
         self._attr_native_min_value = attrs["min"]
         self._attr_native_max_value = attrs["max"]
         if "unit" in attrs.keys():
@@ -158,3 +156,13 @@ class AlfenNumber(NumberEntity):
         self._hub.data[self._key] = value
         await self.update_value()       
         self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> Optional[Dict[str, Any]]:
+        return {
+            "identifiers": {(DOMAIN, self._platform_name)},
+            "name": self._hub.data.get("name", self._platform_name),
+            "manufacturer": ATTR_MANUFACTURER,
+            "model": self._hub.data.get("platformType", "Unknown"),
+            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
+        }

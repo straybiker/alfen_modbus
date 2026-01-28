@@ -172,4 +172,10 @@ class AlfenSensor(SensorEntity):
 
     @property
     def device_info(self) -> Optional[Dict[str, Any]]:
-        return self._device_info
+        return {
+            "identifiers": {(DOMAIN, self._platform_name)},
+            "name": self._hub.data.get("name", self._platform_name),
+            "manufacturer": ATTR_MANUFACTURER,
+            "model": self._hub.data.get("platformType", "Unknown"),
+            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
+        }

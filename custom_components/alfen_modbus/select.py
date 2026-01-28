@@ -83,13 +83,11 @@ class AlfenSelect(SelectEntity):
         """Initialize the selector."""
         self._platform_name = platform_name
         self._hub = hub
-        self._device_info = device_info
         self._name = name+str(socket)
         self._socket = socket
         self._key = key+str(socket)
         self._register = register
         self._option_dict = options
-        self._attr_device_info = device_info
         self._attr_options = list(options.values())
 
     async def async_added_to_hass(self) -> None:
@@ -130,3 +128,12 @@ class AlfenSelect(SelectEntity):
         self._hub.data[self._key] = option
         self.async_write_ha_state()
 
+    @property
+    def device_info(self) -> Optional[Dict[str, Any]]:
+        return {
+            "identifiers": {(DOMAIN, self._platform_name)},
+            "name": self._hub.data.get("name", self._platform_name),
+            "manufacturer": ATTR_MANUFACTURER,
+            "model": self._hub.data.get("platformType", "Unknown"),
+            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
+        }

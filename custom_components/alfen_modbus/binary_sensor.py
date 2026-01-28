@@ -87,14 +87,12 @@ class AlfenBinarySensor(BinarySensorEntity):
         """Initialize the binary sensor."""
         self._platform_name = platform_name
         self._hub = hub
-        self._device_info = device_info
         self._socket = socket
         self._name = f"S{socket} {name}" if hub.has_socket_2 else name
         self._key = f"socket_{socket}_{key}"
         self._attr_device_class = device_class
         self._icon_on = icon_on
         self._icon_off = icon_off
-        self._attr_device_info = device_info
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks."""
@@ -139,4 +137,10 @@ class AlfenBinarySensor(BinarySensorEntity):
     @property
     def device_info(self) -> Optional[Dict[str, Any]]:
         """Return device info."""
-        return self._device_info
+        return {
+            "identifiers": {(DOMAIN, self._platform_name)},
+            "name": self._hub.data.get("name", self._platform_name),
+            "manufacturer": ATTR_MANUFACTURER,
+            "model": self._hub.data.get("platformType", "Unknown"),
+            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
+        }
