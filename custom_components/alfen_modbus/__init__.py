@@ -247,7 +247,7 @@ class AlfenModbusHub:
             async with self._lock:
                 self._ensure_connected()
                 return await self._hass.async_add_executor_job(
-                    self._client.read_holding_registers, address, count, unit
+                    lambda: self._client.read_holding_registers(address=address, count=count, slave=unit)
                 )
         except (BrokenPipeError, ConnectionError, OSError) as e:
             _LOGGER.warning("Connection error during read, attempting reconnect: %s", e)
@@ -260,7 +260,7 @@ class AlfenModbusHub:
                         pass
                     self._client.connect()
                     return await self._hass.async_add_executor_job(
-                        self._client.read_holding_registers, address, count, unit
+                        lambda: self._client.read_holding_registers(address=address, count=count, slave=unit)
                     )
             except Exception as retry_error:
                 _LOGGER.error("Failed to reconnect and retry read: %s", retry_error)
@@ -272,7 +272,7 @@ class AlfenModbusHub:
             async with self._lock:
                 self._ensure_connected()
                 return await self._hass.async_add_executor_job(
-                    self._client.write_registers, address, payload, unit
+                    lambda: self._client.write_registers(address=address, values=payload, slave=unit)
                 )
         except (BrokenPipeError, ConnectionError, OSError) as e:
             _LOGGER.warning("Connection error during write, attempting reconnect: %s", e)
@@ -285,7 +285,7 @@ class AlfenModbusHub:
                         pass
                     self._client.connect()
                     return await self._hass.async_add_executor_job(
-                        self._client.write_registers, address, payload, unit
+                        lambda: self._client.write_registers(address=address, values=payload, slave=unit)
                     )
             except Exception as retry_error:
                 _LOGGER.error("Failed to reconnect and retry write: %s", retry_error)
