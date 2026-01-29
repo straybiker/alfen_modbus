@@ -79,7 +79,7 @@ class AlfenModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return AlfenModbusOptionsFlowHandler(config_entry)
+        return AlfenModbusOptionsFlowHandler()
 
     def _host_in_configuration_exists(self, host) -> bool:
         """Return True if host exists in configuration."""
@@ -115,10 +115,6 @@ class AlfenModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class AlfenModbusOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Alfen Modbus options."""
-
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
