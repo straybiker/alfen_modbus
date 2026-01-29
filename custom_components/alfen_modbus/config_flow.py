@@ -75,6 +75,12 @@ class AlfenModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return AlfenModbusOptionsFlowHandler(config_entry)
+
     def _host_in_configuration_exists(self, host) -> bool:
         """Return True if host exists in configuration."""
         if host in alfen_modbus_entries(self.hass):
@@ -105,3 +111,71 @@ class AlfenModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
         )
+
+
+class AlfenModbusOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Alfen Modbus options."""
+
+    def __init__(self, config_entry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage the options."""
+        errors = {}
+
+        if user_input is not None:
+            # Test connection if host/port changed
+            current_host = self.config_entry.data.get(CONF_HOST)
+            current_port = self.config_entry.data.get(CONF_PORT, DEFAULT_PORT)
+            new_host = user_input.get(CONF_HOST, current_host)
+            new_port = user_input.get(CONF_PORT, current_port)
+
+            if new_host != current_host or new_port != current_port:
+                if not await async_test_connection(self.hass, new_host, new_port):
+                    errors["base"] = "cannot_connect"
+
+            if not errors:
+                # Merge options into data for reload
+                new_data = {**self.config_entry.data, **user_input}
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, data=new_data
+                )
+                # Reload the integration to apply changes
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data=user_input)
+
+        # Build schema with current values as defaults
+        options_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_HOST,
+                    default=self.config_entry.data.get(CONF_HOST, ""),
+                ): str,
+                vol.Required(
+                    CONF_PORT,
+                    default=self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
+                ): int,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=self.config_entry.data.get(
+                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                    ),
+                ): int,
+                vol.Optional(
+                    CONF_READ_SCN,
+                    default=self.config_entry.data.get(CONF_READ_SCN, DEFAULT_READ_SCN),
+                ): bool,
+                vol.Optional(
+                    CONF_READ_SOCKET2,
+                    default=self.config_entry.data.get(
+                        CONF_READ_SOCKET2, DEFAULT_READ_SOCKET2
+                    ),
+                ): bool,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init", data_schema=options_schema, errors=errors
+        )
+
