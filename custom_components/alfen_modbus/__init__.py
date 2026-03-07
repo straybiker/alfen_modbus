@@ -87,7 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][name] = {"hub": hub}
 
     # Read device info before setting up platforms so device_info is available
-    hub.connect()
+    await hass.async_add_executor_job(hub.connect)
     await hub.read_modbus_data()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -160,7 +160,7 @@ class AlfenModbusHub:
         """Listen for data updates."""
         # This is the first sensor, set up interval.
         if not self._sensors:
-            self.connect()
+            self._hass.async_add_executor_job(self.connect)
             self._unsub_interval_method = async_track_time_interval(
                 self._hass, self.async_refresh_modbus_data, self._scan_interval
             )
@@ -181,7 +181,7 @@ class AlfenModbusHub:
             """stop the interval timer upon removal of last sensor"""
             self._unsub_interval_method()
             self._unsub_interval_method = None
-            self.close()
+            self._hass.async_add_executor_job(self.close)
 
 
 
@@ -245,52 +245,58 @@ class AlfenModbusHub:
         """Return true if a battery is available"""
         return self.read_scn
 
+    def _read_with_connect(self, unit, address, count):
+        self._ensure_connected()
+        return self._client.read_holding_registers(address=address, count=count, device_id=unit)
+
     async def read_holding_registers(self, unit, address, count):
         """Read holding registers."""
         try:
             async with self._lock:
-                self._ensure_connected()
                 return await self._hass.async_add_executor_job(
-                    lambda: self._client.read_holding_registers(address=address, count=count, device_id=unit)
+                    self._read_with_connect, unit, address, count
                 )
         except (BrokenPipeError, ConnectionError, OSError) as e:
             _LOGGER.warning("Connection error during read, attempting reconnect: %s", e)
             # Try to reconnect once
             try:
                 async with self._lock:
-                    try:
-                        self._client.close()
-                    except Exception:
-                        pass
-                    self._client.connect()
-                    return await self._hass.async_add_executor_job(
-                        lambda: self._client.read_holding_registers(address=address, count=count, device_id=unit)
-                    )
+                    def _reconnect_and_read():
+                        try:
+                            self._client.close()
+                        except Exception:
+                            pass
+                        self._client.connect()
+                        return self._client.read_holding_registers(address=address, count=count, device_id=unit)
+                    return await self._hass.async_add_executor_job(_reconnect_and_read)
             except Exception as retry_error:
                 _LOGGER.error("Failed to reconnect and retry read: %s", retry_error)
                 raise
+
+    def _write_with_connect(self, unit, address, payload):
+        self._ensure_connected()
+        return self._client.write_registers(address=address, values=payload, device_id=unit)
 
     async def write_registers(self, unit, address, payload):
         """Write registers."""
         try:
             async with self._lock:
-                self._ensure_connected()
                 return await self._hass.async_add_executor_job(
-                    lambda: self._client.write_registers(address=address, values=payload, device_id=unit)
+                    self._write_with_connect, unit, address, payload
                 )
         except (BrokenPipeError, ConnectionError, OSError) as e:
             _LOGGER.warning("Connection error during write, attempting reconnect: %s", e)
             # Try to reconnect once
             try:
                 async with self._lock:
-                    try:
-                        self._client.close()
-                    except Exception:
-                        pass
-                    self._client.connect()
-                    return await self._hass.async_add_executor_job(
-                        lambda: self._client.write_registers(address=address, values=payload, device_id=unit)
-                    )
+                    def _reconnect_and_write():
+                        try:
+                            self._client.close()
+                        except Exception:
+                            pass
+                        self._client.connect()
+                        return self._client.write_registers(address=address, values=payload, device_id=unit)
+                    return await self._hass.async_add_executor_job(_reconnect_and_write)
             except Exception as retry_error:
                 _LOGGER.error("Failed to reconnect and retry write: %s", retry_error)
                 raise
