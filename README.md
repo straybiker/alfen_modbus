@@ -13,8 +13,8 @@ Home Assistant integration for **Alfen Eve NG9xx** series EV chargers via Modbus
 - 🔌 **Real-time monitoring** - Voltage, current, power, energy for all phases
 - 🚗 **Car status detection** - Connected, charging, disconnected states
 - ⚡ **Load balancing control** - Set maximum charging current dynamically
-- �️ **Max current protection** - Prevents setting current above station limit
-- �📊 **Session tracking** - Energy consumed and duration per charging session
+- 🛡️ **Max current protection** - Prevents setting current above station limit
+- 📊 **Session tracking** - Energy consumed and duration per charging session
 - 🔄 **Auto-renew max current** - Prevents timeout to safe current mode
 - 🏢 **Multi-socket support** - Works with dual socket chargers
 - 🌐 **SCN support** - Smart Charging Network (partial)

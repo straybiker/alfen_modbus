@@ -3,7 +3,7 @@ Tests the real AlfenModbusHub (custom_components/alfen_modbus) against the
 simulator, with the few Home Assistant imports stubbed out.
 
 Covers the split into a measurement interval and a scan interval:
-  - decodes are unchanged against the previous release (git HEAD), except the
+  - decodes are unchanged against the previous release (git tag v1.0.2), except the
     meter reading age, which is now one UINT64 in seconds
   - which registers each kind of read requests
   - timer rates, the write-triggered refresh, the busy guard and the
@@ -20,7 +20,8 @@ Usage:
         hub with a pymodbus version that the simulator does not support
 
 Requires pymodbus >= 3.11.2, voluptuous and python-dateutil. Run it from a
-checkout that is a git repository (the comparison loads the HEAD version).
+checkout that is a git repository with its tags (the comparison loads the
+v1.0.2 version).
 """
 import asyncio
 import datetime as dt
@@ -40,6 +41,7 @@ from pymodbus.client import AsyncModbusTcpClient
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+BASELINE_REF = "v1.0.2"
 STATIC_PORT = 5021
 LIVE_PORT = 5022
 
@@ -152,13 +154,13 @@ class Results:
 
 
 def load_old_package():
-    """Load the HEAD version of the integration as package 'alfen_modbus_old'."""
+    """Load the BASELINE_REF version of the integration as package 'alfen_modbus_old'."""
     root = tempfile.mkdtemp(prefix="alfen_old_")
     pkg = os.path.join(root, "alfen_modbus_old")
     os.makedirs(pkg)
     for name in ("__init__.py", "const.py"):
         source = subprocess.run(
-            ["git", "-C", REPO, "show", f"HEAD:custom_components/alfen_modbus/{name}"],
+            ["git", "-C", REPO, "show", f"{BASELINE_REF}:custom_components/alfen_modbus/{name}"],
             capture_output=True, check=True,
         ).stdout
         with open(os.path.join(pkg, name), "wb") as f:
