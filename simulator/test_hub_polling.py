@@ -289,7 +289,11 @@ async def test_timers_and_writes(new_mod, hass, results):
     results.check("meter age always under 1 s and changing", ages and max(ages) < 1 and len(set(ages)) > 3,
                   f"values {sorted(set(ages))[:6]}")
 
-    # A write is followed by a measurement-only refresh.
+    # A write is followed by a measurement-only refresh. Stop the scan timer
+    # first: its own reads would otherwise land in this check at random.
+    hub._unsub_interval_method()
+    hub._unsub_interval_method = lambda: None
+    await asyncio.sleep(0.5)
     calls.clear()
     payload = float_registers(10.0)
     await hub.write_registers(unit=1, address=1210, payload=payload)
