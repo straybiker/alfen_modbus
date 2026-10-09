@@ -424,8 +424,21 @@ async def test_socket_state(new_mod, hass, results):
             await set_mode3(state)
         results.check("session start set at plug-in and kept across a charging pause",
                       start is not None and hub.data.get("socket_1_chargingStart") is start)
+        # A real charger end: Alfen reports E for a few seconds with the car
+        # still plugged in. E and F must not end the session.
+        # The simulated station clock stands still, so a restarted session would
+        # get the same start time: check that the start is never removed.
+        dropped = []
+        for state in ("B2", "E", "B2", "F", "B2"):
+            await set_mode3(state)
+            if "socket_1_chargingStart" not in hub.data:
+                dropped.append(state)
+        results.check("session kept through E and F with the car plugged in", not dropped,
+                      f"session start removed at {dropped}")
         await set_mode3("A")
         results.check("session start cleared at unplug", "socket_1_chargingStart" not in hub.data)
+        await set_mode3("E")
+        results.check("E without a car does not start a session", "socket_1_chargingStart" not in hub.data)
 
         await sim_write(STATIC_PORT, 1, 1210, float_registers(0.0))
         await hub.read_modbus_data_measurements()

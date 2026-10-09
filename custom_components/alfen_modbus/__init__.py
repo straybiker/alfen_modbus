@@ -565,11 +565,14 @@ class AlfenModbusHub:
 
         # Session tracks the whole connected period (plug-in to unplug), not
         # just PWM-active spans, so a brief charging pause (e.g. C2->C1->C2)
-        # doesn't reset the session's accumulated Wh/duration.
-        if self.data["socket_"+str(socket)+"_carconnected"] == 0:
+        # doesn't reset the session's accumulated Wh/duration. Only state A
+        # (no vehicle) ends it. E and F are error and not-available states with
+        # the car possibly still plugged in: Alfen reports E for a few seconds
+        # at the end of a charge. They neither end nor start a session.
+        if not mode3 or mode3.startswith("A"):
             self.data.pop("socket_"+str(socket)+"_chargingStartWh", None)
             self.data.pop("socket_"+str(socket)+"_chargingStart", None)
-        elif "socket_"+str(socket)+"_chargingStartWh" not in self.data:
+        elif mode3.startswith(("B", "C", "D")) and "socket_"+str(socket)+"_chargingStartWh" not in self.data:
             # The totals come from the last slow read. No energy is delivered
             # before the car is connected, so that total is the start value;
             # the start time can be up to one scan interval early.
