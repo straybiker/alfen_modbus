@@ -1,0 +1,26 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  DEFAULT_PYTHON: 3.13
+
+jobs:
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⤵️ Checkout repository
+        uses: actions/checkout@v6
+      - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: 🏗 Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: 🔎 Analyse with ruff
+        run: uv tool run ruff check .

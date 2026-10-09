@@ -1,146 +1,135 @@
 """Binary sensor platform for Alfen Modbus."""
 import logging
-from typing import Optional, Dict, Any
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorEntity,
     BinarySensorDeviceClass,
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
 )
-from homeassistant.const import CONF_NAME
-from homeassistant.core import callback
+from homeassistant.const import CONF_NAME, EntityCategory
 
-from .const import DOMAIN, ATTR_MANUFACTURER
+from . import AlfenConfigEntry
+from .const import DEFAULT_MANUFACTURER, DOMAIN
+from .entity import AlfenEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-BINARY_SENSOR_TYPES = [
-    ["Car Connected", "carconnected", BinarySensorDeviceClass.PLUG, "mdi:power-plug", "mdi:power-plug-off"],
-    ["Car Charging", "carcharging", BinarySensorDeviceClass.BATTERY_CHARGING, "mdi:battery-charging", "mdi:battery-off"],
-]
+BINARY_SENSOR_ENTITY_DESCRIPTORS: tuple[BinarySensorEntityDescription, ...] = (
+    BinarySensorEntityDescription(
+        key="backoffice",
+        translation_key="backoffice",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
 
+SCN_BINARY_SENSOR_ENTITY_DESCRIPTORS: tuple[BinarySensorEntityDescription, ...] = (
+    BinarySensorEntityDescription(
+        key="scnMaxCurrentEnabled",
+        translation_key="scn_max_current_enabled",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
 
-async def async_setup_entry(hass, entry, async_add_entities) -> None:
+SOCKET_BINARY_SENSOR_ENTITY_DESCRIPTORS: tuple[BinarySensorEntityDescription, ...] = (
+    BinarySensorEntityDescription(
+        key="carconnected",
+        translation_key="carconnected",
+        device_class=BinarySensorDeviceClass.PLUG,
+    ),
+    BinarySensorEntityDescription(
+        key="carcharging",
+        translation_key="carcharging",
+        device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
+    ),
+    BinarySensorEntityDescription(
+        key="chargerenabled",
+        translation_key="charger_enabled",
+    ),
+)
+
+async def async_setup_entry(hass, entry: AlfenConfigEntry, async_add_entities) -> None:
     """Set up Alfen binary sensors."""
     hub_name = entry.data[CONF_NAME]
-    hub = hass.data[DOMAIN][hub_name]["hub"]
+    hub = entry.runtime_data
 
     device_info = {
         "identifiers": {(DOMAIN, hub_name)},
         "name": hub_name,
-        "manufacturer": ATTR_MANUFACTURER,
-        "model": hub.data.get("platformType", "Unknown"),
-        "sw_version": hub.data.get("firmwareVersion", "Unknown"),
+        "serial_number": hub.data.get("serial", None),
+        "manufacturer": DEFAULT_MANUFACTURER,
+        "model": hub.data.get("platformType", None),
+        "sw_version": hub.data.get("firmwareVersion", None),
     }
 
-    entities = []
-
-    # Socket 1 binary sensors
-    for sensor_info in BINARY_SENSOR_TYPES:
-        sensor = AlfenBinarySensor(
+    sockets = [1, 2] if hub.has_socket_2 else [1]
+    entities: list[AlfenBinarySensor] = []
+    entities.extend(
+        AlfenBinarySensor(
             hub_name,
             hub,
             device_info,
-            1,
-            sensor_info[0],
-            sensor_info[1],
-            sensor_info[2],
-            sensor_info[3],
-            sensor_info[4],
+            entity_description,
+            None,
         )
-        entities.append(sensor)
-
-    # Socket 2 binary sensors (if available)
-    if hub.has_socket_2:
-        for sensor_info in BINARY_SENSOR_TYPES:
-            sensor = AlfenBinarySensor(
+        for entity_description in BINARY_SENSOR_ENTITY_DESCRIPTORS
+    )
+    if hub.read_scn:
+        entities.extend(
+            AlfenBinarySensor(
                 hub_name,
                 hub,
                 device_info,
-                2,
-                sensor_info[0],
-                sensor_info[1],
-                sensor_info[2],
-                sensor_info[3],
-                sensor_info[4],
+                entity_description,
+                None,
             )
-            entities.append(sensor)
-
+            for entity_description in SCN_BINARY_SENSOR_ENTITY_DESCRIPTORS
+        )
+    entities.extend(
+        AlfenBinarySensor(
+            hub_name,
+            hub,
+            device_info,
+            entity_description,
+            socket,
+        )
+        for entity_description in SOCKET_BINARY_SENSOR_ENTITY_DESCRIPTORS
+        for socket in sockets
+    )
     async_add_entities(entities)
-    return True
 
 
-class AlfenBinarySensor(BinarySensorEntity):
+class AlfenBinarySensor(AlfenEntity, BinarySensorEntity):
     """Representation of an Alfen Modbus binary sensor."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
 
     def __init__(
         self,
-        platform_name,
+        name,
         hub,
         device_info,
-        socket,
-        name,
-        key,
-        device_class,
-        icon_on,
-        icon_off,
+        entity_description: BinarySensorEntityDescription,
+        socket: int | None,
     ) -> None:
         """Initialize the binary sensor."""
-        self._platform_name = platform_name
-        self._hub = hub
-        self._socket = socket
-        self._name = f"S{socket} {name}" if hub.has_socket_2 else name
-        self._key = f"socket_{socket}_{key}"
-        self._attr_device_class = device_class
-        self._icon_on = icon_on
-        self._icon_off = icon_off
-
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
-        self._hub.async_add_alfen_sensor(self._modbus_data_updated)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Remove callbacks."""
-        self._hub.async_remove_alfen_sensor(self._modbus_data_updated)
-
-    @callback
-    def _modbus_data_updated(self) -> None:
-        """Handle updated data from the hub."""
-        self.async_write_ha_state()
-
-    @property
-    def name(self) -> str:
-        """Return the name."""
-        return f"{self._platform_name} {self._name}"
-
-    @property
-    def unique_id(self) -> Optional[str]:
-        """Return unique ID."""
-        return f"{self._platform_name}_{self._key}"
+        super().__init__(hub, device_info)
+        self.entity_description = entity_description
+        if socket is not None:
+            self.key = f"socket_{socket}_{entity_description.key}"
+            if hub.has_socket_2:
+                self._attr_translation_key = f"{entity_description.translation_key}_socket"
+                self._attr_translation_placeholders = {
+                    "socket_number": socket,
+                }
+        else:
+            self.key = entity_description.key
+        self._attr_unique_id = f"{name}_{self.key}"
 
     @property
     def is_on(self) -> bool:
         """Return true if the binary sensor is on."""
-        if self._key in self._hub.data:
-            return self._hub.data[self._key] == 1
+        if self.key in self._hub.data:
+            return self._hub.data[self.key] == 1
         return False
-
-    @property
-    def icon(self) -> str:
-        """Return the icon based on state."""
-        return self._icon_on if self.is_on else self._icon_off
-
-    @property
-    def should_poll(self) -> bool:
-        """Data is delivered by the hub."""
-        return False
-
-    @property
-    def device_info(self) -> Optional[Dict[str, Any]]:
-        """Return device info."""
-        return {
-            "identifiers": {(DOMAIN, self._platform_name)},
-            "name": self._hub.data.get("name", self._platform_name),
-            "manufacturer": ATTR_MANUFACTURER,
-            "model": self._hub.data.get("platformType", "Unknown"),
-            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
-        }

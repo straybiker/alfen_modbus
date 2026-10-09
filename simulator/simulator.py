@@ -15,16 +15,22 @@ Register addressing:
   at block[N] to have it appear at register N+1 from client's perspective.
   Therefore, to have client read register N, we store at block[N-1].
 """
+import argparse
 import asyncio
 import logging
+import os
 import struct
-import argparse
 import subprocess
 import sys
-import os
-from pymodbus.server import StartAsyncTcpServer
-from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext, ModbusDeviceContext
+
+from pymodbus.constants import ExcCodes
+from pymodbus.datastore import (
+    ModbusDeviceContext,
+    ModbusSequentialDataBlock,
+    ModbusServerContext,
+)
 from pymodbus.pdu.device import ModbusDeviceIdentification
+from pymodbus.server import StartAsyncTcpServer
 
 # Default Configuration - matches real Alfen hardware
 DEFAULT_PORT = 502  # Standard Modbus TCP port
@@ -44,10 +50,10 @@ def kill_ghost_processes(port):
         try:
             # Find process using the port
             result = subprocess.run(
-                ['powershell', '-Command', 
-                 f'Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | '
-                 f'Select-Object -ExpandProperty OwningProcess'],
-                capture_output=True, text=True, timeout=5
+                ['powershell', '-Command',
+                 (f'Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | '
+                  'Select-Object -ExpandProperty OwningProcess')],
+                capture_output=True, text=True, timeout=5, check=False
             )
             pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip()]
             
@@ -57,8 +63,8 @@ def kill_ghost_processes(port):
                     pid_int = int(pid)
                     if pid_int != current_pid:
                         log.warning(f"Killing ghost process {pid_int} on port {port}")
-                        subprocess.run(['taskkill', '/F', '/PID', str(pid_int)], 
-                                      capture_output=True, timeout=5)
+                        subprocess.run(['taskkill', '/F', '/PID', str(pid_int)],
+                                      capture_output=True, timeout=5, check=False)
                 except (ValueError, subprocess.TimeoutExpired):
                     pass
                     
@@ -66,14 +72,14 @@ def kill_ghost_processes(port):
                 import time
                 time.sleep(1)  # Wait for port to be released
                 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort cleanup, never fatal
             log.debug(f"Ghost process check failed (non-critical): {e}")
     else:
         # Linux/Mac: use lsof
         try:
             result = subprocess.run(
                 ['lsof', '-ti', f':{port}'],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, timeout=5, check=False
             )
             pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip()]
             
@@ -91,7 +97,7 @@ def kill_ghost_processes(port):
                 import time
                 time.sleep(1)
                 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort cleanup, never fatal
             log.debug(f"Ghost process check failed (non-critical): {e}")
 
 # ============================================================================
@@ -142,6 +148,54 @@ def reg(register):
     return register + 1
 
 # ============================================================================
+# Strict data block (mimics AHP firmware behaviour)
+# ============================================================================
+
+# Value layout of the socket map in client register addresses: (start, length).
+# The 16 float64 energy counters pack 362-425 exactly, ending at 425 inclusive.
+SOCKET_VALUE_LAYOUT = (
+    [(300, 1), (301, 4), (305, 1)]                       # meter state/age/type
+    + [(306 + 2 * i, 2) for i in range(28)]              # float32s, 306-361
+    + [(362 + 4 * i, 4) for i in range(16)]              # float64s, 362-425
+    + [(1200, 1), (1201, 5), (1206, 2), (1208, 2),       # status/control block
+       (1210, 2), (1212, 2), (1214, 1), (1215, 1)]
+)
+
+class StrictValueDataBlock(ModbusSequentialDataBlock):
+    """Data block that rejects reads partially covering a defined value.
+
+    Mirrors strict firmwares (e.g. Alfen AHP): a request is only served when
+    it fully covers every value it touches and contains no unmapped register.
+    Any other request yields Modbus exception 02 (Illegal Data Address).
+    pymodbus 3.11 blocks have no validate(); getValues() receives block
+    addresses (client register + 1, see reg()) and signals range errors by
+    returning ExcCodes.ILLEGAL_ADDRESS, so strictness is enforced there.
+    """
+
+    def __init__(self, value_layout, address=0, size=2000):
+        super().__init__(address, [0] * size)
+        self._address_map = {}
+        self._value_ranges = []
+        for start, length in value_layout:
+            value_id = len(self._value_ranges)
+            block_start = reg(start)
+            self._value_ranges.append((block_start, block_start + length))
+            for block_addr in range(block_start, block_start + length):
+                self._address_map[block_addr] = value_id
+
+    def getValues(self, address, count=1):
+        touched = set()
+        for block_addr in range(address, address + count):
+            value_id = self._address_map.get(block_addr)
+            if value_id is None:
+                return ExcCodes.ILLEGAL_ADDRESS
+            touched.add(value_id)
+        for start, end in (self._value_ranges[i] for i in touched):
+            if start < address or end > address + count:
+                return ExcCodes.ILLEGAL_ADDRESS
+        return super().getValues(address, count)
+
+# ============================================================================
 # Product/Station Context (Unit 200)
 # ============================================================================
 
@@ -159,7 +213,7 @@ def setup_product_context():
     
     # Time registers (168-178)
     import datetime
-    now = datetime.datetime.now()
+    now = datetime.datetime.now()  # noqa: DTZ005 - simulates the charger's local wall clock
     block.setValues(reg(168), encode_int16(now.year))
     block.setValues(reg(169), encode_int16(now.month))
     block.setValues(reg(170), encode_int16(now.day))
@@ -175,6 +229,24 @@ def setup_product_context():
     block.setValues(reg(1104), encode_uint16(1))     # Backoffice Connected
     block.setValues(reg(1105), encode_uint16(1))     # Number of Sockets
 
+    # === SCN (Registers 1400-1431) ===
+    block.setValues(reg(1400), encode_string("TESTSCN", 8))  # SCN Name (4 regs)
+    block.setValues(reg(1404), encode_uint16(2))             # SCN Sockets
+    block.setValues(reg(1405), encode_float(11.0))           # SCN Total Consumption L1
+    block.setValues(reg(1407), encode_float(12.0))           # SCN Total Consumption L2
+    block.setValues(reg(1409), encode_float(13.0))           # SCN Total Consumption L3
+    block.setValues(reg(1411), encode_float(21.0))           # SCN Actual Max Current L1
+    block.setValues(reg(1413), encode_float(22.0))           # SCN Actual Max Current L2
+    block.setValues(reg(1415), encode_float(23.0))           # SCN Actual Max Current L3
+    block.setValues(reg(1417), encode_float(31.0))           # SCN Max Current per Phase L1
+    block.setValues(reg(1419), encode_float(32.0))           # SCN Max Current per Phase L2
+    block.setValues(reg(1421), encode_float(33.0))           # SCN Max Current per Phase L3
+    block.setValues(reg(1423), encode_uint32(41))            # Remaining valid time L1
+    block.setValues(reg(1425), encode_uint32(42))            # Remaining valid time L2
+    block.setValues(reg(1427), encode_uint32(43))            # Remaining valid time L3
+    block.setValues(reg(1429), encode_float(51.0))           # SCN Safe Current
+    block.setValues(reg(1431), encode_uint16(1))             # SCN Modbus Slave Max Current Enable
+
     return ModbusDeviceContext(hr=block)
 
 # ============================================================================
@@ -182,13 +254,18 @@ def setup_product_context():
 # ============================================================================
 
 def setup_socket_context(socket_id):
-    """Sets up a socket context (Unit 1 or 2)."""
-    block = ModbusSequentialDataBlock(0, [0]*2000)
+    """Sets up a socket context (Unit 1 or 2).
+
+    Uses StrictValueDataBlock so the simulator rejects reads that partially
+    cover a defined value, like the AHP firmware does.
+    """
+    block = StrictValueDataBlock(SOCKET_VALUE_LAYOUT)
     
-    # === Meter Measurements (Registers 300-424) ===
-    # HA reads registers 300-424 (125 registers) and uses offsets from 300
+    # === Meter Measurements (Registers 300-425, 126 registers) ===
+    # HA reads this as two value-aligned chunks (300-361 and 362-425)
+    # and uses offsets from 300 against the concatenated block.
     block.setValues(reg(300), encode_uint16(3))      # Meter State (offset 0)
-    block.setValues(reg(301), encode_uint64(500))    # Meter Age ms (offset 1, UINT64, 4 regs)
+    block.setValues(reg(301), encode_uint64(500))    # Meter last value timestamp, ms (UNSIGNED64, 4 regs)
     block.setValues(reg(305), encode_uint16(1))      # Meter Type (offset 5)
     
     # Voltages L-N (float32, V) - offset 6, 8, 10
@@ -247,17 +324,17 @@ def setup_socket_context(socket_id):
     block.setValues(reg(386), encode_double(0.0))
     block.setValues(reg(390), encode_double(0.0))
     
-    # Apparent Energy (float64, VAh) - offset 92, 96, 100, 104
-    block.setValues(reg(392), encode_double(15542.0))
-    block.setValues(reg(396), encode_double(15485.0))
-    block.setValues(reg(400), encode_double(15612.0))
-    block.setValues(reg(404), encode_double(46639.0))
+    # Apparent Energy (float64, VAh) - offset 94, 98, 102, 106
+    block.setValues(reg(394), encode_double(15542.0))
+    block.setValues(reg(398), encode_double(15485.0))
+    block.setValues(reg(402), encode_double(15612.0))
+    block.setValues(reg(406), encode_double(46639.0))
     
-    # Reactive Energy (float64, VArh) - offset 108, 112, 116, 120
-    block.setValues(reg(408), encode_double(3024.0))
-    block.setValues(reg(412), encode_double(3189.0))
-    block.setValues(reg(416), encode_double(2956.0))
-    block.setValues(reg(420), encode_double(9169.0))  # Reactive Energy Sum
+    # Reactive Energy (float64, VArh) - offset 110, 114, 118, 122
+    block.setValues(reg(410), encode_double(3024.0))
+    block.setValues(reg(414), encode_double(3189.0))
+    block.setValues(reg(418), encode_double(2956.0))
+    block.setValues(reg(422), encode_double(9169.0))  # Reactive Energy Sum (422-425)
     
     # === Socket Status/Control (Registers 1200-1215) ===
     # HA reads registers 1200-1215 (16 registers)
@@ -323,8 +400,8 @@ async def update_simulation(context, static=False):
                 slave.setValues(3, 344, encode_float(p_sum))
                 e_sum = decode_double_regs(slave.getValues(3, 374, 4)) + p_sum / 3600.0
                 slave.setValues(3, 374, encode_double(e_sum))
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001 - keep the mirror loop alive
+                log.debug("Max current mirror failed for unit %s: %s", unit, err)
 
 # ============================================================================
 # Main
@@ -350,9 +427,9 @@ async def run_server(port, static=False):
     identity.MajorMinorRevision = '5.16.0'
 
     log.info(f"Starting Alfen Eve Simulator on port {port}...")
-    log.info(f"  Unit 200: Product/Station information")
-    log.info(f"  Unit 1: Socket 1")
-    log.info(f"  Unit 2: Socket 2")
+    log.info("  Unit 200: Product/Station information")
+    log.info("  Unit 1: Socket 1")
+    log.info("  Unit 2: Socket 2")
     
     server_task = asyncio.create_task(StartAsyncTcpServer(
         context=store,

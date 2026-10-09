@@ -1,4 +1,5 @@
 DOMAIN = "alfen_modbus"
+DEFAULT_MANUFACTURER = "Alfen"
 DEFAULT_NAME = "alfen"
 DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_PORT = 502
@@ -20,149 +21,96 @@ VALID_TIME_S = "maxCurrentValidTime_socket_"
 MAX_CURRENT_S = "maxCurrent_socket_"
 
 SENSOR_TYPES = {
-    "Name": ["Name","name" , None, None],
-    "Manufacturer": ["Manufacturer","manufacturer" , None, None],
-    "Modbus_table_version": ["Modbus table version","modbustableVersion" , None, None],
-    "Firmware_version": ["Firmware version","firmwareVersion" , None, None],
-    "Platform_type": ["Platform Type","platformType" , None, None],
-    "Serial": ["Serial","serial" , None, None],
-    "Current_time": ["Current time","stationTime" , None, None],
-    "Last_boot": ["Last boot","lastBoot" , None, None],
-    
-    "Actual_max_current": ["Actual max current","actualMaxCurrent" , "A", "mdi:current-dc"],
-    "Board_temp": ["Board temperature","boardTemperature" ,  "°C", None],
-    "Backoffice_connected": ["Backoffice connected","backofficeConnected" , None, None],
-    "Number_of_sockets": ["Number of sockets","numberOfSockets" , None, None],    
+    "Name": ["name", "name", None, None],
+    "Manufacturer": ["manufacturer", "manufacturer", None, None],
+    "Modbus_table_version": ["modbus_table_version", "modbustableVersion", None, None],
+    "Firmware_version": ["firmware_version", "firmwareVersion", None, None],
+    "Platform_type": ["platform_type", "platformType", None, None],
+    "Serial": ["serial", "serial", None, None],
+    "Current_time": ["current_time", "stationTime", None, None],
+    "Last_boot": ["last_boot", "lastBoot", None, None],
+    "Actual_max_current": ["actual_max_current", "actualMaxCurrent", "A", "mdi:current-dc"],
+    "Board_temp": ["board_temperature", "boardTemperature", "°C", None],
+    "Backoffice_connected": ["backoffice_connected", "backofficeConnected", None, None],
+    "Number_of_sockets": ["number_of_sockets", "numberOfSockets", None, None],
 }
 
 
-SOCKET1_SENSOR_TYPES = {
-  "S1_Meterstate": ["S1 Meter state","socket_1_meterstate" , None, None],
-  "S1_Meterage": ["S1 Meter reading age","socket_1_meterAge" ,  "s", None],
-  "S1_Metertype": ["S1 Meter Type","socket_1_meterType" , None, None],
-  "S1_VoltageL1N": ["S1 Voltage L1-N","socket_1_VL1-N" , "V", None],
-  "S1_VoltageL2N": ["S1 Voltage L2-N","socket_1_VL2-N" , "V", None],
-  "S1_VoltageL3N": ["S1 Voltage L3-N","socket_1_VL3-N" , "V", None],
-  "S1_VoltageL1L2": ["S1 Voltage L1-L2","socket_1_VL1-L2" , "V", None],
-  "S1_VoltageL2L3": ["S1 Voltage L2-L3","socket_1_VL2-L3" , "V", None],
-  "S1_VoltageL3L1": ["S1 Voltage L3-L1","socket_1_VL3-L1" , "V", None],
-  "S1_CurrN": ["S1 Current N","socket_1_currentN" , "A",  "mdi:current-ac"],
-  "S1_CurrL1": ["S1 Current L1","socket_1_currentL1" , "A",  "mdi:current-ac"],
-  "S1_CurrL2": ["S1 Current L2","socket_1_currentL2" , "A",  "mdi:current-ac"],
-  "S1_CurrL3": ["S1 Current L3","socket_1_currentL3" , "A",  "mdi:current-ac"],
-  "S1_CurrTotal": ["S1 Current Total","socket_1_currentSum" , "A",  "mdi:current-ac"],
-  "S1_PowerFactorL1": ["S1 Power factor L1","socket_1_powerL1" , None, None],
-  "S1_PowerFactorL2": ["S1 Power factor L2","socket_1_powerL2" , None, None],
-  "S1_PowerFactorL3": ["S1 Power factor L3","socket_1_powerL3" , None, None],
-  "S1_PowerFactorSum": ["S1 Power factor sum","socket_1_powerSum" ,  None, None],
-  "S1_Frequency": ["S1 Frequency","socket_1_frequency" , "Hz", None],
-  "S1_RealPowerL1": ["S1 Real power L1","socket_1_realPowerL1" , "W", None],
-  "S1_RealPowerL2": ["S1 Real power L2","socket_1_realPowerL2" , "W", None],
-  "S1_RealPowerL3": ["S1 Real power L3","socket_1_realPowerL3" , "W", None],
-  "S1_RealPowerSum": ["S1 Real power sum","socket_1_realPowerSum" , "W",None],
-  "S1_Apparent_Power_PhaseL1": ["S1 Apparent power L1","socket_1_apparentPowerL1" , "VA",  None],
-  "S1_Apparent_Power_PhaseL2": ["S1 Apparent power L2","socket_1_apparentPowerL2" , "VA",  None],
-  "S1_Apparent_Power_PhaseL3": ["S1 Apparent power L3","socket_1_apparentPowerL3" , "VA",  None],
-  "S1_Apparent_Power_Sum": ["S1 Apparent power sum","socket_1_apparentPowerSum" , "VA", None],
-  "S1_Reactive_Power_Phase_L1": ["S1 Reactive power L1","socket_1_reactivePowerL1" , "var", None],
-  "S1_Reactive_Power_Phase_L2": ["S1 Reactive power L2","socket_1_reactivePowerL2" , "var", None],
-  "S1_Reactive_Power_Phase_L3": ["S1 Reactive power L3","socket_1_reactivePowerL3" , "var", None],
-  "S1_Reactive_Power_Sum": ["S1 Reactive power sum","socket_1_reactivePowerSum" , "var",None],
-  "S1_Real_Enegery_Delivered_Phase_L1": ["S1 Real energy delivered L1","socket_1_realEnergyDeliveredL1" , "Wh",None],
-  "S1_Real_Enegery_Delivered_Phase_L2": ["S1 Real energy delivered L2","socket_1_realEnergyDeliveredL2" , "Wh",None],
-  "S1_Real_Enegery_Delivered_Phase_L3": ["S1 Real energy delivered L3","socket_1_realEnergyDeliveredL3" , "Wh",None],
-  "S1_Real_Enegery_Delivered_Sum": ["S1 Real energy delivered sum","socket_1_realEnergyDeliveredSum" , "Wh",None],
-  "S1_Real_Energy_Cosumed_Phase_L1": ["S1 Real energy consumed L1","socket_1_realEnergyConsumedL1" , "Wh", None],
-  "S1_Real_Energy_Cosumed_Phase_L2": ["S1 Real energy consumed L2","socket_1_realEnergyConsumedL2" , "Wh", None],
-  "S1_Real_Energy_Cosumed_Phase_L3": ["S1 Real energy consumed L3","socket_1_realEnergyConsumedL3" , "Wh", None],
-  "S1_Real_Energy_Cosumed_Sum": ["S1 Real energy consumed sum","socket_1_realEnergyConsumedSum" , "Wh",None],
-  "S1_Apparent_Energy_Phase_L1": ["S1 Apparent energy L1","socket_1_apparentEnergyL1" , "VAh",    None],
-  "S1_Apparent_Energy_Phase_L2": ["S1 Apparent energy L2","socket_1_apparentEnergyL2" , "VAh",    None],
-  "S1_Apparent_Energy_Phase_L3": ["S1 Apparent energy L3","socket_1_apparentEnergyL3" , "VAh",    None],
-  "S1_Apparent_Energy_Sum": ["S1 Apparent energy sum","socket_1_apparentEnergySum" , "VAh",   None],
-  "S1_Reactive_Energy_Phase_L1": ["S1 Reactive energy L1","socket_1_reactiveEnergyL1" , "varh",    None],
-  "S1_Reactive_Energy_Phase_L2": ["S1 Reactive energy L2","socket_1_reactiveEnergyL2" , "varh",    None],
-  "S1_Reactive_Energy_Phase_L3": ["S1 Reactive energy L3","socket_1_reactiveEnergyL3" , "varh",    None],
-  "S1_Reactive_Energy_Sum": ["S1 Reactive energy sum","socket_1_reactiveEnergySum" , "varh",   None],
-  "S1_Availability": ["S1 Availability","socket_1_available" ,  None, None],
-  "S1_Mode3State": ["S1 Mode 3 State","socket_1_mode3state" ,  None, None],
-  "S1_Actual_Applied_Max_Current": ["S1 Actual applied max current","socket_1_actualMaxCurrent" , "A",  "mdi:current-ac"],
-  "S1_Modbus_Slave_Max_Current_Valid_Time": ["S1 Max current valid time",VALID_TIME_S+str(1) ,  "s", None],
-  "S1_Modbus_Slave_Max_Current": ["S1 Max current",MAX_CURRENT_S+str(1) , "A",  "mdi:current-ac"],
-  "S1_Active_Load_Balacing_Save_Current": ["S1 Active load balacing safe current","socket_1_saveCurrent" , "A",  "mdi:current-ac"],
-  "S1_Slave_Setpoint_Accounted": ["S1 Received SP accounted for","socket_1_setpointAccounted" ,  None, None],
-  "S1_Charging_Mode_Phases": ["S1 Charging Mode","socket_1_chargephases" , None, None],  
-  "S1_Car_Charging": ["S1 Car charging","socket_1_carcharging" , None, None],  
-  "S1_Car_Connected": ["S1 Car connected","socket_1_carconnected" , None, None],  
-  "S1_CurrentSession": ["S1 Current session Wh", "socket_1_currentSession", "Wh", None],
-  "S1_CurrentSessionDuration": ["S1 Current session duration", "socket_1_currentSessionDuration", "s", None],
-}
-
-SOCKET2_SENSOR_TYPES = {
-  "S2_Meterstate": ["S2 Meter state","socket_2_meterstate" , None, None],
-  "S2_Meterage": ["S2 Meter reading age","socket_2_meterAge" ,  "s", None],
-  "S2_Metertype": ["S2 Meter Type","socket_2_meterType" , None, None],
-  "S2_VoltageL1N": ["S2 Voltage L1-N","socket_2_VL1-N" , "V", None],
-  "S2_VoltageL2N": ["S2 Voltage L2-N","socket_2_VL2-N" , "V", None],
-  "S2_VoltageL3N": ["S2 Voltage L3-N","socket_2_VL3-N" , "V", None],
-  "S2_VoltageL1L2": ["S2 Voltage L1-L2","socket_2_VL1-L2" , "V", None],
-  "S2_VoltageL2L3": ["S2 Voltage L2-L3","socket_2_VL2-L3" , "V", None],
-  "S2_VoltageL3L1": ["S2 Voltage L3-L1","socket_2_VL3-L1" , "V", None],
-  "S2_CurrN": ["S2 Current N","socket_2_currentN" , "A",  "mdi:current-ac"],
-  "S2_CurrL1": ["S2 Current L1","socket_2_currentL1" , "A",  "mdi:current-ac"],
-  "S2_CurrL2": ["S2 Current L2","socket_2_currentL2" , "A",  "mdi:current-ac"],
-  "S2_CurrL3": ["S2 Current L3","socket_2_currentL3" , "A",  "mdi:current-ac"],
-  "S2_CurrTotal": ["S2 Current Total","socket_2_currentSum" , "A",  "mdi:current-ac"],
-  "S2_PowerFactorL1": ["S2 Power factor L1","socket_2_powerL1" , None, None],
-  "S2_PowerFactorL2": ["S2 Power factor L2","socket_2_powerL2" , None, None],
-  "S2_PowerFactorL3": ["S2 Power factor L3","socket_2_powerL3" , None, None],
-  "S2_PowerFactorSum": ["S2 Power factor sum","socket_2_powerSum" ,  None, None],
-  "S2_Frequency": ["S2 Frequency","socket_2_frequency" , "Hz", None],
-  "S2_RealPowerL1": ["S2 Real power L1","socket_2_realPowerL1" , "W", None],
-  "S2_RealPowerL2": ["S2 Real power L2","socket_2_realPowerL2" , "W", None],
-  "S2_RealPowerL3": ["S2 Real power L3","socket_2_realPowerL3" , "W", None],
-  "S2_RealPowerSum": ["S2 Real power sum","socket_2_realPowerSum" , "W",None],
-  "S2_Apparent_Power_PhaseL1": ["S2 Apparent power L1","socket_2_apparentPowerL1" , "VA",  None],
-  "S2_Apparent_Power_PhaseL2": ["S2 Apparent power L2","socket_2_apparentPowerL2" , "VA",  None],
-  "S2_Apparent_Power_PhaseL3": ["S2 Apparent power L3","socket_2_apparentPowerL3" , "VA",  None],
-  "S2_Apparent_Power_Sum": ["S2 Apparent power sum","socket_2_apparentPowerSum" , "VA", None],
-  "S2_Reactive_Power_Phase_L1": ["S2 Reactive power L1","socket_2_reactivePowerL1" , "var", None],
-  "S2_Reactive_Power_Phase_L2": ["S2 Reactive power L2","socket_2_reactivePowerL2" , "var", None],
-  "S2_Reactive_Power_Phase_L3": ["S2 Reactive power L3","socket_2_reactivePowerL3" , "var", None],
-  "S2_Reactive_Power_Sum": ["S2 Reactive power sum","socket_2_reactivePowerSum" , "var",None],
-  "S2_Real_Enegery_Delivered_Phase_L1": ["S2 Real energy delivered L1","socket_2_realEnergyDeliveredL1" , "Wh",None],
-  "S2_Real_Enegery_Delivered_Phase_L2": ["S2 Real energy delivered L2","socket_2_realEnergyDeliveredL2" , "Wh",None],
-  "S2_Real_Enegery_Delivered_Phase_L3": ["S2 Real energy delivered L3","socket_2_realEnergyDeliveredL3" , "Wh",None],
-  "S2_Real_Enegery_Delivered_Sum": ["S2 Real energy delivered sum","socket_2_realEnergyDeliveredSum" , "Wh",None],
-  "S2_Real_Energy_Cosumed_Phase_L1": ["S2 Real energy consumed L1","socket_2_realEnergyConsumedL1" , "Wh", None],
-  "S2_Real_Energy_Cosumed_Phase_L2": ["S2 Real energy consumed L2","socket_2_realEnergyConsumedL2" , "Wh", None],
-  "S2_Real_Energy_Cosumed_Phase_L3": ["S2 Real energy consumed L3","socket_2_realEnergyConsumedL3" , "Wh", None],
-  "S2_Real_Energy_Cosumed_Sum": ["S2 Real energy consumed sum","socket_2_realEnergyConsumedSum" , "Wh",None],
-  "S2_Apparent_Energy_Phase_L1": ["S2 Apparent energy L1","socket_2_apparentEnergyL1" , "VAh",    None],
-  "S2_Apparent_Energy_Phase_L2": ["S2 Apparent energy L2","socket_2_apparentEnergyL2" , "VAh",    None],
-  "S2_Apparent_Energy_Phase_L3": ["S2 Apparent energy L3","socket_2_apparentEnergyL3" , "VAh",    None],
-  "S2_Apparent_Energy_Sum": ["S2 Apparent energy sum","socket_2_apparentEnergySum" , "VAh",   None],
-  "S2_Reactive_Energy_Phase_L1": ["S2 Reactive energy L1","socket_2_reactiveEnergyL1" , "varh",    None],
-  "S2_Reactive_Energy_Phase_L2": ["S2 Reactive energy L2","socket_2_reactiveEnergyL2" , "varh",    None],
-  "S2_Reactive_Energy_Phase_L3": ["S2 Reactive energy L3","socket_2_reactiveEnergyL3" , "varh",    None],
-  "S2_Reactive_Energy_Sum": ["S2 Reactive energy sum","socket_2_reactiveEnergySum" , "varh",   None],
-  "S2_Availability": ["S2 Availability","socket_2_available" ,  None, None],
-  "S2_Mode3State": ["S2 Mode 3 State","socket_2_mode3state" ,  None, None],
-  "S2_Actual_Applied_Max_Current": ["S2 Actual applied max current","socket_2_actualMaxCurrent" , "A",  "mdi:current-ac"],
-  "S2_Modbus_Slave_Max_Current_Valid_Time": ["S2 Max current valid time",VALID_TIME_S+str(2) ,  "s", None],
-  "S2_Modbus_Slave_Max_Current": ["S2 Max current",MAX_CURRENT_S+str(2) , "A",  "mdi:current-ac"],
-  "S2_Active_Load_Balacing_Save_Current": ["S2 Active load balacing safe current","socket_2_saveCurrent" , "A",  "mdi:current-ac"],
-  "S2_Slave_Setpoint_Accounted": ["S2 Received SP accounted for","socket_2_setpointAccounted" ,  None, None],
-  "S2_Charging_Mode_Phases": ["S2 Charging Mode","socket_2_chargephases" , None, None],  
-  "S2_Car_Charging": ["S2 Car charging","socket_2_carcharging" , None, None],  
-  "S2_Car_Connected": ["S2 Car connected","socket_2_carconnected" , None, None],    
-  "S2_CurrentSession": ["S2 Current session Wh", "socket_2_currentSession", "Wh", None],
-  "S2_CurrentSessionDuration": ["S2 Current session duration", "socket_2_currentSessionDuration", "s", None],
+SOCKET_SENSOR_TYPES = {
+    "S1_Meterstate": ["meter_state", "socket_{socket}_meterstate", None, None],
+    "S1_Meterage": ["meter_reading_age", "socket_{socket}_meterAge", "s", None],
+    "S1_Metertype": ["meter_type", "socket_{socket}_meterType", None, None],
+    "S1_VoltageL1N": ["voltage_l1_n", "socket_{socket}_VL1-N", "V", None],
+    "S1_VoltageL2N": ["voltage_l2_n", "socket_{socket}_VL2-N", "V", None],
+    "S1_VoltageL3N": ["voltage_l3_n", "socket_{socket}_VL3-N", "V", None],
+    "S1_VoltageL1L2": ["voltage_l1_l2", "socket_{socket}_VL1-L2", "V", None],
+    "S1_VoltageL2L3": ["voltage_l2_l3", "socket_{socket}_VL2-L3", "V", None],
+    "S1_VoltageL3L1": ["voltage_l3_l1", "socket_{socket}_VL3-L1", "V", None],
+    "S1_CurrN": ["current_n", "socket_{socket}_currentN", "A", "mdi:current-ac"],
+    "S1_CurrL1": ["current_l1", "socket_{socket}_currentL1", "A", "mdi:current-ac"],
+    "S1_CurrL2": ["current_l2", "socket_{socket}_currentL2", "A", "mdi:current-ac"],
+    "S1_CurrL3": ["current_l3", "socket_{socket}_currentL3", "A", "mdi:current-ac"],
+    "S1_CurrTotal": ["current_total", "socket_{socket}_currentSum", "A", "mdi:current-ac"],
+    "S1_PowerFactorL1": ["power_factor_l1", "socket_{socket}_powerL1", None, None],
+    "S1_PowerFactorL2": ["power_factor_l2", "socket_{socket}_powerL2", None, None],
+    "S1_PowerFactorL3": ["power_factor_l3", "socket_{socket}_powerL3", None, None],
+    "S1_PowerFactorSum": ["power_factor_sum", "socket_{socket}_powerSum", None, None],
+    "S1_Frequency": ["frequency", "socket_{socket}_frequency", "Hz", None],
+    "S1_RealPowerL1": ["real_power_l1", "socket_{socket}_realPowerL1", "W", None],
+    "S1_RealPowerL2": ["real_power_l2", "socket_{socket}_realPowerL2", "W", None],
+    "S1_RealPowerL3": ["real_power_l3", "socket_{socket}_realPowerL3", "W", None],
+    "S1_RealPowerSum": ["real_power_sum", "socket_{socket}_realPowerSum", "W", None],
+    "S1_Apparant_Power_PhaseL1": ["apparent_power_l1", "socket_{socket}_apparantPowerL1", "VA", None],
+    "S1_Apparant_Power_PhaseL2": ["apparent_power_l2", "socket_{socket}_apparantPowerL2", "VA", None],
+    "S1_Apparant_Power_PhaseL3": ["apparent_power_l3", "socket_{socket}_apparantPowerL3", "VA", None],
+    "S1_Apparant_Power_Sum": ["apparent_power_sum", "socket_{socket}_apparantPowerSum", "VA", None],
+    "S1_Reactive_Power_Phase_L1": ["reactive_power_l1", "socket_{socket}_reactivePowerL1", "var", None],
+    "S1_Reactive_Power_Phase_L2": ["reactive_power_l2", "socket_{socket}_reactivePowerL2", "var", None],
+    "S1_Reactive_Power_Phase_L3": ["reactive_power_l3", "socket_{socket}_reactivePowerL3", "var", None],
+    "S1_Reactive_Power_Sum": ["reactive_power_sum", "socket_{socket}_reactivePowerSum", "var", None],
+    "S1_Real_Enegery_Delivered_Phase_L1": ["real_energy_delivered_l1", "socket_{socket}_realEnergyDeliveredL1", "Wh", None],
+    "S1_Real_Enegery_Delivered_Phase_L2": ["real_energy_delivered_l2", "socket_{socket}_realEnergyDeliveredL2", "Wh", None],
+    "S1_Real_Enegery_Delivered_Phase_L3": ["real_energy_delivered_l3", "socket_{socket}_realEnergyDeliveredL3", "Wh", None],
+    "S1_Real_Enegery_Delivered_Sum": ["real_energy_delivered_sum", "socket_{socket}_realEnergyDeliveredSum", "Wh", None],
+    "S1_Real_Energy_Cosumed_Phase_L1": ["real_energy_consumed_l1", "socket_{socket}_realEnergyConsumedL1", "Wh", None],
+    "S1_Real_Energy_Cosumed_Phase_L2": ["real_energy_consumed_l2", "socket_{socket}_realEnergyConsumedL2", "Wh", None],
+    "S1_Real_Energy_Cosumed_Phase_L3": ["real_energy_consumed_l3", "socket_{socket}_realEnergyConsumedL3", "Wh", None],
+    "S1_Real_Energy_Cosumed_Sum": ["real_energy_consumed_sum", "socket_{socket}_realEnergyConsumedSum", "Wh", None],
+    "S1_Apparant_Energy_Phase_L1": ["apparent_energy_l1", "socket_{socket}_apparantEnergyL1", "VAh", None],
+    "S1_Apparant_Energy_Phase_L2": ["apparent_energy_l2", "socket_{socket}_apparantEnergyL2", "VAh", None],
+    "S1_Apparant_Energy_Phase_L3": ["apparent_energy_l3", "socket_{socket}_apparantEnergyL3", "VAh", None],
+    "S1_Apparant_Energy_Sum": ["apparent_energy_sum", "socket_{socket}_apparantEnergySum", "VAh", None],
+    "S1_Reactieve_Energy_Phase_L1": ["reactive_energy_l1", "socket_{socket}_reactiveEnergyL1", "varh", None],
+    "S1_Reactieve_Energy_Phase_L2": ["reactive_energy_l2", "socket_{socket}_reactiveEnergyL2", "varh", None],
+    "S1_Reactieve_Energy_Phase_L3": ["reactive_energy_l3", "socket_{socket}_reactiveEnergyL3", "varh", None],
+    "S1_Reactieve_Energy_Sum": ["reactive_energy_sum", "socket_{socket}_reactiveEnergySum", "varh", None],
+    "S1_Availability": ["availability", "socket_{socket}_available", None, None],
+    "S1_Mode3State": ["mode_3_state", "socket_{socket}_mode3state", None, None],
+    "S1_Actual_Applied_Max_Current": ["actual_applied_max_current", "socket_{socket}_actualMaxCurrent", "A", "mdi:current-ac"],
+    "S1_Modbus_Slave_Max_Current_Valid_Time": ["max_current_valid_time", "maxCurrentValidTime_socket_{socket}", "s", None],
+    "S1_Modbus_Slave_Max_Current": ["max_current", "maxCurrent_socket_{socket}", "A", "mdi:current-ac"],
+    "S1_Active_Load_Balacing_Save_Current": ["active_load_balancing_safe_current", "socket_{socket}_saveCurrent", "A", "mdi:current-ac"],
+    "S1_Slave_Setpoint_Accounted": ["received_sp_accounted_for", "socket_{socket}_setpointAccounted", None, None],
+    "S1_Charging_Mode_Phases": ["charging_mode", "socket_{socket}_chargephases", None, None],
+    "S1_Car_Charging": ["car_charging", "socket_{socket}_carcharging", None, None],
+    "S1_Car_Connected": ["car_connected", "socket_{socket}_carconnected", None, None],
+    "S1_CurrentSession": ["current_session_wh", "socket_{socket}_currentSession", "Wh", None],
+    "S1_CurrentSessionDuration": ["current_session_duration", "socket_{socket}_currentSessionDuration", "s", None],
 }
 
 SCN_SENSOR_TYPES = {
-  "SCN_Name": ["SCN Name","scnName" , None, None],
-  "Number_of_scn_sockets": ["Number of SCN sockets","scnSockets" , None, None],
+    "SCN_Name": ["scn_name", "scnName", None, None],
+    "Number_of_scn_sockets": ["number_of_scn_sockets", "scnSockets", None, None],
+    "SCN_Total_Consumption_L1": ["scn_total_consumption_l1", "scnTotalConsumptionL1", "A", "mdi:current-ac"],
+    "SCN_Total_Consumption_L2": ["scn_total_consumption_l2", "scnTotalConsumptionL2", "A", "mdi:current-ac"],
+    "SCN_Total_Consumption_L3": ["scn_total_consumption_l3", "scnTotalConsumptionL3", "A", "mdi:current-ac"],
+    "SCN_Actual_Max_Current_L1": ["scn_actual_max_current_l1", "scnActualMaxCurrentL1", "A", "mdi:current-ac"],
+    "SCN_Actual_Max_Current_L2": ["scn_actual_max_current_l2", "scnActualMaxCurrentL2", "A", "mdi:current-ac"],
+    "SCN_Actual_Max_Current_L3": ["scn_actual_max_current_l3", "scnActualMaxCurrentL3", "A", "mdi:current-ac"],
+    "SCN_Max_Current_Valid_Time_L1": ["scn_max_current_valid_time_l1", "scnMaxCurrentValidTimeL1", "s", None],
+    "SCN_Max_Current_Valid_Time_L2": ["scn_max_current_valid_time_l2", "scnMaxCurrentValidTimeL2", "s", None],
+    "SCN_Max_Current_Valid_Time_L3": ["scn_max_current_valid_time_l3", "scnMaxCurrentValidTimeL3", "s", None],
+    "SCN_Safe_Current": ["scn_safe_current", "scnSafeCurrent", "A", "mdi:current-ac"],
 }
 
 
@@ -174,14 +122,23 @@ METER_TYPE = {
     4: "Other",
 }
 
-SCN_MAX_CURRENT_ENABLED = {
-    1: "Enabled",
-    0: "Disbled",    
-}
-
 BOOLEAN_EXPLAINED = {
     1: True,
-    0: False,    
+    0: False,
+}
+
+# Sensor keys whose value comes from BOOLEAN_EXPLAINED and should be
+# rendered as a localized "on"/"off" enum state instead of a raw
+# Python boolean. Their translation_key already comes from
+# SENSOR_TYPES/SOCKET_SENSOR_TYPES.
+ENUM_SENSOR_KEYS = {
+    "backofficeConnected",
+    "socket_1_setpointAccounted",
+    "socket_2_setpointAccounted",
+    "socket_1_carconnected",
+    "socket_2_carconnected",
+    "socket_1_carcharging",
+    "socket_2_carcharging",
 }
 
 METER_STATE_MODES = {    
@@ -213,11 +170,32 @@ CONTROL_PHASE_MODES = {
     3: "3 Phases",    
 }
 
+# EVCC (and other integrations expecting a plain select) require the literal
+# option values "1"/"3" rather than the human-readable CONTROL_PHASE_MODES
+# text used by the read-only "charging mode" sensor.
+PHASE_SWITCH_OPTIONS = {
+    1: "1",
+    3: "3",
+}
+
 CONTROL_PHASE = [
-    ["Usable phases", "usephases_S", 1215, CONTROL_PHASE_MODES],
+    ["usable_phases", "usephases_S", 1215, PHASE_SWITCH_OPTIONS],
 ]
 
 
+MAX_CURRENT_REGISTER = 1210
+
 CONTROL_SLAVE_MAX_CURRENT = [
-    ["Max Current Limit S", MAX_CURRENT_S, 1210, "f", {"min": 0, "max": 32, "unit": "A", "mode": "slider", "step": 0.1}]
+    ["max_current_limit", MAX_CURRENT_S, MAX_CURRENT_REGISTER, "f", {"min": 0, "max": 32, "unit": "A", "mode": "slider", "step": 0.1}]
+]
+
+SCN_MAX_CURRENT_L = "scnMaxCurrent"
+SCN_MAX_CURRENT_VALID_TIME_L = "scnMaxCurrentValidTime"
+
+SCN_ACTUAL_MAX_CURRENT_L = "scnActualMaxCurrent"
+
+CONTROL_SCN_MAX_CURRENT = [
+    ["scn_max_current_phase_l1", SCN_MAX_CURRENT_L + "L1", "L1", 1417, {"min": 0, "max": 32, "unit": "A", "mode": "slider", "step": 0.1}],
+    ["scn_max_current_phase_l2", SCN_MAX_CURRENT_L + "L2", "L2", 1419, {"min": 0, "max": 32, "unit": "A", "mode": "slider", "step": 0.1}],
+    ["scn_max_current_phase_l3", SCN_MAX_CURRENT_L + "L3", "L3", 1421, {"min": 0, "max": 32, "unit": "A", "mode": "slider", "step": 0.1}],
 ]
