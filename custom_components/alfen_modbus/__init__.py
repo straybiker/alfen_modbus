@@ -532,10 +532,10 @@ class AlfenModbusHub:
         # Pad to keep the offsets relative to register 300, as in the register map.
         registers = [0] * 46 + list(totals_data.registers)
 
-        self.data["socket_"+str(socket)+"_apparantPowerL1"] =   round(self.decode_from_registers(registers,46,2,self._client.DATATYPE.FLOAT32),2)
-        self.data["socket_"+str(socket)+"_apparantPowerL2"] =   round(self.decode_from_registers(registers,48,2,self._client.DATATYPE.FLOAT32),2)
-        self.data["socket_"+str(socket)+"_apparantPowerL3"] =  round(self.decode_from_registers(registers,50,2,self._client.DATATYPE.FLOAT32),2)
-        self.data["socket_"+str(socket)+"_apparantPowerSum"] =  round(self.decode_from_registers(registers,52,2,self._client.DATATYPE.FLOAT32),2)
+        self.data["socket_"+str(socket)+"_apparentPowerL1"] =   round(self.decode_from_registers(registers,46,2,self._client.DATATYPE.FLOAT32),2)
+        self.data["socket_"+str(socket)+"_apparentPowerL2"] =   round(self.decode_from_registers(registers,48,2,self._client.DATATYPE.FLOAT32),2)
+        self.data["socket_"+str(socket)+"_apparentPowerL3"] =  round(self.decode_from_registers(registers,50,2,self._client.DATATYPE.FLOAT32),2)
+        self.data["socket_"+str(socket)+"_apparentPowerSum"] =  round(self.decode_from_registers(registers,52,2,self._client.DATATYPE.FLOAT32),2)
 
         self.data["socket_"+str(socket)+"_reactivePowerL1"] =   round(self.decode_from_registers(registers,54,2,self._client.DATATYPE.FLOAT32),2)
         self.data["socket_"+str(socket)+"_reactivePowerL2"] =   round(self.decode_from_registers(registers,56,2,self._client.DATATYPE.FLOAT32),2)
@@ -550,10 +550,10 @@ class AlfenModbusHub:
         self.data["socket_"+str(socket)+"_realEnergyConsumedL2"] =   round(self.decode_from_registers(registers,82,4,self._client.DATATYPE.FLOAT64),2)
         self.data["socket_"+str(socket)+"_realEnergyConsumedL3"] =  round(self.decode_from_registers(registers,86,4,self._client.DATATYPE.FLOAT64),2)
         self.data["socket_"+str(socket)+"_realEnergyConsumedSum"] =   round(self.decode_from_registers(registers,90,4,self._client.DATATYPE.FLOAT64),2)
-        self.data["socket_"+str(socket)+"_apparantEnergyL1"] =  round(self.decode_from_registers(registers,92,4,self._client.DATATYPE.FLOAT64),2)
-        self.data["socket_"+str(socket)+"_apparantEnergyL2"] =   round(self.decode_from_registers(registers,96,4,self._client.DATATYPE.FLOAT64),2)
-        self.data["socket_"+str(socket)+"_apparantEnergyL3"] =  round(self.decode_from_registers(registers,100,4,self._client.DATATYPE.FLOAT64),2)
-        self.data["socket_"+str(socket)+"_apparantEnergySum"] =  round(self.decode_from_registers(registers,104,4,self._client.DATATYPE.FLOAT64),2)
+        self.data["socket_"+str(socket)+"_apparentEnergyL1"] =  round(self.decode_from_registers(registers,92,4,self._client.DATATYPE.FLOAT64),2)
+        self.data["socket_"+str(socket)+"_apparentEnergyL2"] =   round(self.decode_from_registers(registers,96,4,self._client.DATATYPE.FLOAT64),2)
+        self.data["socket_"+str(socket)+"_apparentEnergyL3"] =  round(self.decode_from_registers(registers,100,4,self._client.DATATYPE.FLOAT64),2)
+        self.data["socket_"+str(socket)+"_apparentEnergySum"] =  round(self.decode_from_registers(registers,104,4,self._client.DATATYPE.FLOAT64),2)
 
         self.data["socket_"+str(socket)+"_reactiveEnergyL1"] =   round(self.decode_from_registers(registers,108,4,self._client.DATATYPE.FLOAT64),2)
         self.data["socket_"+str(socket)+"_reactiveEnergyL2"] =   round(self.decode_from_registers(registers,112,4,self._client.DATATYPE.FLOAT64),2)

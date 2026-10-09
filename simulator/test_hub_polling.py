@@ -4,8 +4,9 @@ simulator, with the few Home Assistant imports stubbed out.
 
 Covers the split into a measurement interval and a scan interval:
   - decodes are unchanged against the previous release (git tag v1.0.2), except the
-    meter reading age, which is now one UINT64 in seconds, and the session
-    duration, which is now whole seconds instead of a timedelta
+    meter reading age, which is now one UINT64 in seconds, the session
+    duration, which is now whole seconds instead of a timedelta, and the
+    apparent power and energy keys, which were spelled "apparant"
   - which registers each kind of read requests
   - timer rates, the write-triggered refresh, the busy guard and the
     max current refresh
@@ -231,9 +232,16 @@ async def test_decode_regression(new_mod, old_mod, hass, results):
         await hub.read_modbus_data()
         hub.close()
 
-    only_old = sorted(set(old_hub.data) - set(new_hub.data))
-    only_new = sorted(set(new_hub.data) - set(old_hub.data))
-    differ = sorted(k for k in set(old_hub.data) & set(new_hub.data) if old_hub.data[k] != new_hub.data[k])
+    # v1.0.2 stored apparent power and energy under "apparant" keys, which the
+    # sensors never read.
+    renamed = sorted(k for k in old_hub.data if "_apparant" in k)
+    old_data = {k.replace("_apparant", "_apparent"): v for k, v in old_hub.data.items()}
+    results.check("apparent power and energy keys renamed from 'apparant' (8 per socket)",
+                  len(renamed) == 8 and not any("_apparant" in k for k in new_hub.data), f"renamed={renamed}")
+
+    only_old = sorted(set(old_data) - set(new_hub.data))
+    only_new = sorted(set(new_hub.data) - set(old_data))
+    differ = sorted(k for k in set(old_data) & set(new_hub.data) if old_data[k] != new_hub.data[k])
     results.check("same set of data keys", not only_old and not only_new, f"old-only={only_old} new-only={only_new}")
     results.check("only the meter reading age and session duration differ",
                   differ == ["socket_1_currentSessionDuration", "socket_1_meterAge"], f"differ={differ}")

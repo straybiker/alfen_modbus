@@ -10,6 +10,7 @@ Covers:
   - unique IDs keep their format
   - every sensor renders a valid state through SensorEntity.state, with the
     data of a real hub read from the static simulator (both sockets and SCN)
+  - every station and socket 1 sensor with a unit gets a value from the hub
 
 Usage:
     python test_sensor_classes.py         # starts its own simulator on 5023
@@ -144,6 +145,13 @@ async def test_states(new_mod, sensor_mod, const, results):
     results.check("every sensor with a unit or state class gives a number", not wrong_type,
                   ", ".join(wrong_type))
     log.info(f"        {with_value} of {len(sensors)} sensors have a value")
+
+    # The simulator reports one socket, so socket 2 has no data.
+    measured = [v[1] for table in (const.SENSOR_TYPES, const.SOCKET1_SENSOR_TYPES)
+                for v in table.values() if v[2] is not None]
+    no_value = [k for k in measured if sensors[k].state is None]
+    results.check("every station and socket 1 sensor with a unit has a value", not no_value,
+                  f"no value: {no_value}")
 
     duration = sensors["socket_1_currentSessionDuration"]
     results.check("session duration renders as seconds",
