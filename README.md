@@ -116,7 +116,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
-### Unreleased
+### v1.2.0 (beta)
 
 - **Device classes** - Every sensor with a unit now has a Home Assistant device class (current, voltage, frequency, power, apparent power, reactive power, energy, reactive energy, duration, temperature), and the power factor sensors have the power factor class. Entity selectors that filter on device class now list these sensors. Apparent energy (VAh) has no device class, because Home Assistant has none for it
 - **Reactive units** - Reactive power is now in `var` (was `VAr`) and reactive energy in `varh` (was `VAh`, which was wrong). Home Assistant flags the unit change for existing statistics: fix it in **Developer tools > Statistics**
