@@ -14,6 +14,7 @@ Configuration:
     local_config.py with ALFEN_HOST and ALFEN_PORT (gitignored)
 """
 import argparse
+import itertools
 import statistics
 import struct
 import time
@@ -89,7 +90,7 @@ def main():
     if ages:
         print(f"  meter reading age (ms): median {statistics.median(ages):.0f}, "
               f"p95 {percentile(ages, 95):.0f}, max {max(ages)}")
-        changes = sum(1 for a, b in zip(powers, powers[1:]) if a != b)
+        changes = sum(1 for a, b in itertools.pairwise(powers) if a != b)
         print(f"  real power sum: {changes} changes in {len(powers)} reads, last {powers[-1]} W")
     for err in errors[:5]:
         print(f"  error: {err}")

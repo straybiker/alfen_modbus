@@ -2,24 +2,563 @@
   "config": {
     "step": {
       "user": {
-        "title": "Definieer uw Alfen modbus-verbinding",
+        "title": "Alfen Modbus-verbinding",
+        "description": "Configureer de verbinding met uw Alfen-laadstation",
         "data": {
-          "host": "Het ip-adres van uw Alfen-omvormer",
-          "name": "Het voorvoegsel dat moet worden gebruikt voor uw Alfen-sensoren",
-          "port": "De TCP-poort waarop verbinding moet worden gemaakt met de Alfen-omvormer",
-	    	  "modbus_address": "Modbus adres",
+          "host": "Host",
+          "name": "Naam",
+          "port": "Poort",
+          "modbus_address": "Modbus adres",
           "read_scn": "Lees SCN (Smart Charging Network) data",
           "read_socket_2": "Lees 2e socket data",
           "scan_interval": "De polling-frequentie van de modbus registratie in seconden",
-          "measurement_interval": "Meetinterval in seconden voor vermogen, stroom, spanning en laadstatus (2-5 s voor load balancing)"
+          "measurement_interval": "Meetinterval"
+        },
+        "data_description": {
+          "host": "Het ip-adres of de hostnaam van uw Alfen-laadstation",
+          "name": "Voorvoegsel voor de sensornamen",
+          "port": "TCP-poort (standaard: 502)",
+          "modbus_address": "Modbus slave-adres (standaard: 200)",
+          "read_scn": "Schakel Smart Charging Network-registers in",
+          "read_socket_2": "Schakel 2e socket in voor apparaten met twee sockets",
+          "scan_interval": "Polling-interval in seconden voor energietotalen en stationgegevens",
+          "measurement_interval": "Polling-interval in seconden voor vermogen, stroom, spanning en laadstatus. Gebruik 2-5 s voor load balancing; standaard gelijk aan het polling-interval"
         }
       }
     },
     "error": {
-      "already_configured": "Apparaat is al geconfigureerd"
+      "already_configured": "Apparaat is al geconfigureerd",
+      "invalid_host": "Ongeldig ip-adres of hostnaam",
+      "cannot_connect": "Kan geen verbinding maken met het apparaat"
     },
     "abort": {
       "already_configured": "Apparaat is al geconfigureerd"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alfen Modbus-opties",
+        "description": "Herconfigureer uw Alfen-laadstation verbinding",
+        "data": {
+          "host": "Host",
+          "port": "Poort",
+          "read_scn": "Lees SCN",
+          "read_socket_2": "Lees 2e socket",
+          "scan_interval": "Polling-interval",
+          "measurement_interval": "Meetinterval"
+        },
+        "data_description": {
+          "host": "Het ip-adres of de hostnaam van uw Alfen-laadstation",
+          "port": "TCP-poort (standaard: 502)",
+          "read_scn": "Schakel Smart Charging Network-registers in",
+          "read_socket_2": "Schakel 2e socket in voor apparaten met twee sockets",
+          "scan_interval": "Polling-interval in seconden voor energietotalen en stationgegevens",
+          "measurement_interval": "Polling-interval in seconden voor vermogen, stroom, spanning en laadstatus. Gebruik 2-5 s voor load balancing; standaard gelijk aan het polling-interval"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met het apparaat"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "backoffice": {
+        "name": "Back office"
+      },
+      "carconnected_socket": {
+        "name": "Aansluiting {socket_number} verbindingsstatus",
+        "state": {
+          "on": "Aangesloten",
+          "off": "Niet aangesloten"
+        }
+      },
+      "carconnected": {
+        "name": "Verbindingsstatus",
+        "state": {
+          "on": "Aangesloten",
+          "off": "Niet aangesloten"
+        }
+      },
+      "carcharging_socket": {
+        "name": "Aansluiting {socket_number} laadstatus",
+        "state": {
+          "on": "Opladen",
+          "off": "Niet opladen"
+        }
+      },
+      "carcharging": {
+        "name": "Laadstatus",
+        "state": {
+          "on": "Opladen",
+          "off": "Niet opladen"
+        }
+      },
+      "charger_enabled_socket": {
+        "name": "Aansluiting {socket_number} laden ingeschakeld",
+        "state": {
+          "on": "Ingeschakeld",
+          "off": "Uitgeschakeld"
+        }
+      },
+      "charger_enabled": {
+        "name": "Laden ingeschakeld",
+        "state": {
+          "on": "Ingeschakeld",
+          "off": "Uitgeschakeld"
+        }
+      }
+    },
+    "sensor": {
+      "name": {
+        "name": "Naam"
+      },
+      "manufacturer": {
+        "name": "Fabrikant"
+      },
+      "modbus_table_version": {
+        "name": "Modbus-tabelversie"
+      },
+      "firmware_version": {
+        "name": "Firmwareversie"
+      },
+      "platform_type": {
+        "name": "Platformtype"
+      },
+      "serial": {
+        "name": "Serienummer"
+      },
+      "current_time": {
+        "name": "Huidige tijd"
+      },
+      "last_boot": {
+        "name": "Laatste opstart"
+      },
+      "actual_max_current": {
+        "name": "Werkelijke maximale stroom"
+      },
+      "board_temperature": {
+        "name": "Printplaattemperatuur"
+      },
+      "backoffice_connected": {
+        "name": "Backoffice verbonden",
+        "state": {
+          "on": "Verbonden",
+          "off": "Niet verbonden"
+        }
+      },
+      "number_of_sockets": {
+        "name": "Aantal aansluitingen"
+      },
+      "scn_name": {
+        "name": "SCN-naam"
+      },
+      "number_of_scn_sockets": {
+        "name": "Aantal SCN-aansluitingen"
+      },
+      "meter_state_socket": {
+        "name": "Aansluiting {socket_number} metertoestand"
+      },
+      "meter_state": {
+        "name": "Metertoestand"
+      },
+      "meter_reading_age_socket": {
+        "name": "Aansluiting {socket_number} meterstand leeftijd"
+      },
+      "meter_reading_age": {
+        "name": "Meterstand leeftijd"
+      },
+      "meter_type_socket": {
+        "name": "Aansluiting {socket_number} metertype"
+      },
+      "meter_type": {
+        "name": "Metertype"
+      },
+      "voltage_l1_n_socket": {
+        "name": "Aansluiting {socket_number} spanning L1-N"
+      },
+      "voltage_l1_n": {
+        "name": "Spanning L1-N"
+      },
+      "voltage_l2_n_socket": {
+        "name": "Aansluiting {socket_number} spanning L2-N"
+      },
+      "voltage_l2_n": {
+        "name": "Spanning L2-N"
+      },
+      "voltage_l3_n_socket": {
+        "name": "Aansluiting {socket_number} spanning L3-N"
+      },
+      "voltage_l3_n": {
+        "name": "Spanning L3-N"
+      },
+      "voltage_l1_l2_socket": {
+        "name": "Aansluiting {socket_number} spanning L1-L2"
+      },
+      "voltage_l1_l2": {
+        "name": "Spanning L1-L2"
+      },
+      "voltage_l2_l3_socket": {
+        "name": "Aansluiting {socket_number} spanning L2-L3"
+      },
+      "voltage_l2_l3": {
+        "name": "Spanning L2-L3"
+      },
+      "voltage_l3_l1_socket": {
+        "name": "Aansluiting {socket_number} spanning L3-L1"
+      },
+      "voltage_l3_l1": {
+        "name": "Spanning L3-L1"
+      },
+      "current_n_socket": {
+        "name": "Aansluiting {socket_number} stroom N"
+      },
+      "current_n": {
+        "name": "Stroom N"
+      },
+      "current_l1_socket": {
+        "name": "Aansluiting {socket_number} stroom L1"
+      },
+      "current_l1": {
+        "name": "Stroom L1"
+      },
+      "current_l2_socket": {
+        "name": "Aansluiting {socket_number} stroom L2"
+      },
+      "current_l2": {
+        "name": "Stroom L2"
+      },
+      "current_l3_socket": {
+        "name": "Aansluiting {socket_number} stroom L3"
+      },
+      "current_l3": {
+        "name": "Stroom L3"
+      },
+      "current_total_socket": {
+        "name": "Aansluiting {socket_number} totale stroom"
+      },
+      "current_total": {
+        "name": "Totale stroom"
+      },
+      "power_factor_l1_socket": {
+        "name": "Aansluiting {socket_number} vermogensfactor L1"
+      },
+      "power_factor_l1": {
+        "name": "Vermogensfactor L1"
+      },
+      "power_factor_l2_socket": {
+        "name": "Aansluiting {socket_number} vermogensfactor L2"
+      },
+      "power_factor_l2": {
+        "name": "Vermogensfactor L2"
+      },
+      "power_factor_l3_socket": {
+        "name": "Aansluiting {socket_number} vermogensfactor L3"
+      },
+      "power_factor_l3": {
+        "name": "Vermogensfactor L3"
+      },
+      "power_factor_sum_socket": {
+        "name": "Aansluiting {socket_number} vermogensfactor totaal"
+      },
+      "power_factor_sum": {
+        "name": "Vermogensfactor totaal"
+      },
+      "frequency_socket": {
+        "name": "Aansluiting {socket_number} frequentie"
+      },
+      "frequency": {
+        "name": "Frequentie"
+      },
+      "real_power_l1_socket": {
+        "name": "Aansluiting {socket_number} actief vermogen L1"
+      },
+      "real_power_l1": {
+        "name": "Actief vermogen L1"
+      },
+      "real_power_l2_socket": {
+        "name": "Aansluiting {socket_number} actief vermogen L2"
+      },
+      "real_power_l2": {
+        "name": "Actief vermogen L2"
+      },
+      "real_power_l3_socket": {
+        "name": "Aansluiting {socket_number} actief vermogen L3"
+      },
+      "real_power_l3": {
+        "name": "Actief vermogen L3"
+      },
+      "real_power_sum_socket": {
+        "name": "Aansluiting {socket_number} actief vermogen totaal"
+      },
+      "real_power_sum": {
+        "name": "Actief vermogen totaal"
+      },
+      "apparent_power_l1_socket": {
+        "name": "Aansluiting {socket_number} schijnbaar vermogen L1"
+      },
+      "apparent_power_l1": {
+        "name": "Schijnbaar vermogen L1"
+      },
+      "apparent_power_l2_socket": {
+        "name": "Aansluiting {socket_number} schijnbaar vermogen L2"
+      },
+      "apparent_power_l2": {
+        "name": "Schijnbaar vermogen L2"
+      },
+      "apparent_power_l3_socket": {
+        "name": "Aansluiting {socket_number} schijnbaar vermogen L3"
+      },
+      "apparent_power_l3": {
+        "name": "Schijnbaar vermogen L3"
+      },
+      "apparent_power_sum_socket": {
+        "name": "Aansluiting {socket_number} schijnbaar vermogen totaal"
+      },
+      "apparent_power_sum": {
+        "name": "Schijnbaar vermogen totaal"
+      },
+      "reactive_power_l1_socket": {
+        "name": "Aansluiting {socket_number} blindvermogen L1"
+      },
+      "reactive_power_l1": {
+        "name": "Blindvermogen L1"
+      },
+      "reactive_power_l2_socket": {
+        "name": "Aansluiting {socket_number} blindvermogen L2"
+      },
+      "reactive_power_l2": {
+        "name": "Blindvermogen L2"
+      },
+      "reactive_power_l3_socket": {
+        "name": "Aansluiting {socket_number} blindvermogen L3"
+      },
+      "reactive_power_l3": {
+        "name": "Blindvermogen L3"
+      },
+      "reactive_power_sum_socket": {
+        "name": "Aansluiting {socket_number} blindvermogen totaal"
+      },
+      "reactive_power_sum": {
+        "name": "Blindvermogen totaal"
+      },
+      "real_energy_delivered_l1_socket": {
+        "name": "Aansluiting {socket_number} geleverde actieve energie L1"
+      },
+      "real_energy_delivered_l1": {
+        "name": "Geleverde actieve energie L1"
+      },
+      "real_energy_delivered_l2_socket": {
+        "name": "Aansluiting {socket_number} geleverde actieve energie L2"
+      },
+      "real_energy_delivered_l2": {
+        "name": "Geleverde actieve energie L2"
+      },
+      "real_energy_delivered_l3_socket": {
+        "name": "Aansluiting {socket_number} geleverde actieve energie L3"
+      },
+      "real_energy_delivered_l3": {
+        "name": "Geleverde actieve energie L3"
+      },
+      "real_energy_delivered_sum_socket": {
+        "name": "Aansluiting {socket_number} geleverde actieve energie totaal"
+      },
+      "real_energy_delivered_sum": {
+        "name": "Geleverde actieve energie totaal"
+      },
+      "real_energy_consumed_l1_socket": {
+        "name": "Aansluiting {socket_number} verbruikte actieve energie L1"
+      },
+      "real_energy_consumed_l1": {
+        "name": "Verbruikte actieve energie L1"
+      },
+      "real_energy_consumed_l2_socket": {
+        "name": "Aansluiting {socket_number} verbruikte actieve energie L2"
+      },
+      "real_energy_consumed_l2": {
+        "name": "Verbruikte actieve energie L2"
+      },
+      "real_energy_consumed_l3_socket": {
+        "name": "Aansluiting {socket_number} verbruikte actieve energie L3"
+      },
+      "real_energy_consumed_l3": {
+        "name": "Verbruikte actieve energie L3"
+      },
+      "real_energy_consumed_sum_socket": {
+        "name": "Aansluiting {socket_number} verbruikte actieve energie totaal"
+      },
+      "real_energy_consumed_sum": {
+        "name": "Verbruikte actieve energie totaal"
+      },
+      "apparent_energy_l1_socket": {
+        "name": "Aansluiting {socket_number} schijnbare energie L1"
+      },
+      "apparent_energy_l1": {
+        "name": "Schijnbare energie L1"
+      },
+      "apparent_energy_l2_socket": {
+        "name": "Aansluiting {socket_number} schijnbare energie L2"
+      },
+      "apparent_energy_l2": {
+        "name": "Schijnbare energie L2"
+      },
+      "apparent_energy_l3_socket": {
+        "name": "Aansluiting {socket_number} schijnbare energie L3"
+      },
+      "apparent_energy_l3": {
+        "name": "Schijnbare energie L3"
+      },
+      "apparent_energy_sum_socket": {
+        "name": "Aansluiting {socket_number} schijnbare energie totaal"
+      },
+      "apparent_energy_sum": {
+        "name": "Schijnbare energie totaal"
+      },
+      "reactive_energy_l1_socket": {
+        "name": "Aansluiting {socket_number} blindenergie L1"
+      },
+      "reactive_energy_l1": {
+        "name": "Blindenergie L1"
+      },
+      "reactive_energy_l2_socket": {
+        "name": "Aansluiting {socket_number} blindenergie L2"
+      },
+      "reactive_energy_l2": {
+        "name": "Blindenergie L2"
+      },
+      "reactive_energy_l3_socket": {
+        "name": "Aansluiting {socket_number} blindenergie L3"
+      },
+      "reactive_energy_l3": {
+        "name": "Blindenergie L3"
+      },
+      "reactive_energy_sum_socket": {
+        "name": "Aansluiting {socket_number} blindenergie totaal"
+      },
+      "reactive_energy_sum": {
+        "name": "Blindenergie totaal"
+      },
+      "availability_socket": {
+        "name": "Aansluiting {socket_number} beschikbaarheid"
+      },
+      "availability": {
+        "name": "Beschikbaarheid"
+      },
+      "mode_3_state_socket": {
+        "name": "Aansluiting {socket_number} modus 3-status"
+      },
+      "mode_3_state": {
+        "name": "Modus 3-status"
+      },
+      "actual_applied_max_current_socket": {
+        "name": "Aansluiting {socket_number} werkelijk toegepaste maximale stroom"
+      },
+      "actual_applied_max_current": {
+        "name": "Werkelijk toegepaste maximale stroom"
+      },
+      "max_current_valid_time_socket": {
+        "name": "Aansluiting {socket_number} geldigheidsduur maximale stroom"
+      },
+      "max_current_valid_time": {
+        "name": "Geldigheidsduur maximale stroom"
+      },
+      "max_current_socket": {
+        "name": "Aansluiting {socket_number} maximale stroom"
+      },
+      "max_current": {
+        "name": "Maximale stroom"
+      },
+      "active_load_balancing_safe_current_socket": {
+        "name": "Aansluiting {socket_number} veilige stroom bij actieve load balancing"
+      },
+      "active_load_balancing_safe_current": {
+        "name": "Veilige stroom bij actieve load balancing"
+      },
+      "received_sp_accounted_for_socket": {
+        "name": "Aansluiting {socket_number} ontvangen setpoint verwerkt",
+        "state": {
+          "on": "Ja",
+          "off": "Nee"
+        }
+      },
+      "received_sp_accounted_for": {
+        "name": "Ontvangen setpoint verwerkt",
+        "state": {
+          "on": "Ja",
+          "off": "Nee"
+        }
+      },
+      "charging_mode_socket": {
+        "name": "Aansluiting {socket_number} laadmodus"
+      },
+      "charging_mode": {
+        "name": "Laadmodus"
+      },
+      "car_charging_socket": {
+        "name": "Aansluiting {socket_number} auto laadt",
+        "state": {
+          "on": "Opladen",
+          "off": "Niet opladen"
+        }
+      },
+      "car_charging": {
+        "name": "Auto laadt",
+        "state": {
+          "on": "Opladen",
+          "off": "Niet opladen"
+        }
+      },
+      "car_connected_socket": {
+        "name": "Aansluiting {socket_number} auto aangesloten",
+        "state": {
+          "on": "Aangesloten",
+          "off": "Niet aangesloten"
+        }
+      },
+      "car_connected": {
+        "name": "Auto aangesloten",
+        "state": {
+          "on": "Aangesloten",
+          "off": "Niet aangesloten"
+        }
+      },
+      "current_session_wh_socket": {
+        "name": "Aansluiting {socket_number} huidige sessie Wh"
+      },
+      "current_session_wh": {
+        "name": "Huidige sessie Wh"
+      },
+      "current_session_duration_socket": {
+        "name": "Aansluiting {socket_number} huidige sessieduur"
+      },
+      "current_session_duration": {
+        "name": "Huidige sessieduur"
+      }
+    },
+    "number": {
+      "max_current_limit_socket": {
+        "name": "Aansluiting {socket_number} maximale stroomlimiet"
+      },
+      "max_current_limit": {
+        "name": "Maximale stroomlimiet"
+      }
+    },
+    "select": {
+      "usable_phases_socket": {
+        "name": "Aansluiting {socket_number} bruikbare fasen"
+      },
+      "usable_phases": {
+        "name": "Bruikbare fasen"
+      }
+    },
+    "switch": {
+      "charger_enabled_socket": {
+        "name": "Aansluiting {socket_number} laden ingeschakeld"
+      },
+      "charger_enabled": {
+        "name": "Laden ingeschakeld"
+      }
     }
   }
 }

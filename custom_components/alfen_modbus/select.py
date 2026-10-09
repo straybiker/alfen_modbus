@@ -1,23 +1,21 @@
 import logging
-from typing import Optional, Dict, Any
 
+from homeassistant.components.select import SelectEntity
+from homeassistant.const import CONF_NAME
+
+from . import AlfenConfigEntry
 from .const import (
-    DOMAIN,
     ATTR_MANUFACTURER,
     CONTROL_PHASE,
-    CONTROL_PHASE_MODES,
+    DOMAIN,
 )
-
-from homeassistant.const import CONF_NAME
-from homeassistant.components.select import SelectEntity
-
-from homeassistant.core import callback
+from .entity import AlfenEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities) -> None:
+async def async_setup_entry(hass, entry: AlfenConfigEntry, async_add_entities) -> None:
     hub_name = entry.data[CONF_NAME]
-    hub = hass.data[DOMAIN][hub_name]["hub"]
+    hub = entry.runtime_data
 
     device_info = {
         "identifiers": {(DOMAIN, hub_name)},
@@ -67,53 +65,38 @@ def get_key(my_dict, search):
             return k
     return None
 
-class AlfenSelect(SelectEntity):
+class AlfenSelect(AlfenEntity, SelectEntity):
     """Representation of an Alfen Modbus select."""
+
+    _attr_has_entity_name = True
 
     def __init__(self,
                  platform_name,
                  hub,
                  device_info,
                  socket,
-                 name,
+                 translation_key,
                  key,
                  register,
                  options
     ) -> None:
         """Initialize the selector."""
+        super().__init__(hub, device_info)
         self._platform_name = platform_name
-        self._hub = hub
-        self._name = name+str(socket)
+        if hub.has_socket_2:
+            self._attr_translation_key = f"{translation_key}_socket"
+            self._attr_translation_placeholders = {"socket_number": socket}
+        else:
+            self._attr_translation_key = translation_key
         self._socket = socket
         self._key = key+str(socket)
         self._register = register
         self._option_dict = options
         self._attr_options = list(options.values())
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
-        self._hub.async_add_alfen_sensor(self._modbus_data_updated)
-
-    async def async_will_remove_from_hass(self) -> None:
-        self._hub.async_remove_alfen_sensor(self._modbus_data_updated)
-
-    @callback
-    def _modbus_data_updated(self) -> None:
-        self.async_write_ha_state()
-
     @property
-    def name(self) -> str:
-        """Return the name."""
-        return f"{self._platform_name} {self._name}"
-
-    @property
-    def unique_id(self) -> Optional[str]:
+    def unique_id(self) -> str | None:
         return f"{self._platform_name}_{self._key}"
-
-    @property
-    def should_poll(self) -> bool:
-        """Data is delivered by the hub"""
-        return False
 
     @property
     def current_option(self) -> str:
@@ -128,13 +111,3 @@ class AlfenSelect(SelectEntity):
         self._hub.data[self._key] = option
         self.hass.async_create_task(self._hub.async_refresh_modbus_data())
         self.async_write_ha_state()
-
-    @property
-    def device_info(self) -> Optional[Dict[str, Any]]:
-        return {
-            "identifiers": {(DOMAIN, self._platform_name)},
-            "name": self._hub.data.get("name", self._platform_name),
-            "manufacturer": ATTR_MANUFACTURER,
-            "model": self._hub.data.get("platformType", "Unknown"),
-            "sw_version": self._hub.data.get("firmwareVersion", "Unknown"),
-        }

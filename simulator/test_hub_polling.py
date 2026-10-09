@@ -2,14 +2,15 @@
 Tests the real AlfenModbusHub (custom_components/alfen_modbus) against the
 simulator, with the few Home Assistant imports stubbed out.
 
-Covers the split into a measurement interval and a scan interval:
-  - decodes are unchanged against the previous release (git tag v1.0.2), except the
-    meter reading age, which is now one UINT64 in seconds, the session
-    duration, which is now whole seconds instead of a timedelta, and the
-    apparent power and energy keys, which were spelled "apparant"
+Covers:
+  - every socket value decodes from the register given in the Alfen register
+    map (the test holds its own copy of the addresses)
   - which registers each kind of read requests
   - timer rates, the write-triggered refresh, the busy guard and the
     max current refresh
+  - Mode 3 state families, the session across a charging pause, the
+    charger-enabled flag and the meter age "not available" value
+  - the outdated NG9xx firmware repair issue, and no reads after teardown
   - identification: read at setup and reload, and again after a charger
     restart (with a retry when that read fails)
   - how async_setup_entry picks the measurement interval, and the config schema
@@ -21,19 +22,17 @@ Usage:
         runs the simulators with another interpreter, for example to test the
         hub with a pymodbus version that the simulator does not support
 
-Requires pymodbus >= 3.11.2, voluptuous and python-dateutil. Run it from a
-checkout that is a git repository with its tags (the comparison loads the
-v1.0.2 version).
+Requires pymodbus >= 3.11.2, voluptuous and python-dateutil.
 """
 import asyncio
 import datetime as dt
 import importlib
+import itertools
 import logging
 import os
 import struct
 import subprocess
 import sys
-import tempfile
 import time
 import types
 from concurrent.futures import ThreadPoolExecutor
@@ -43,13 +42,35 @@ from pymodbus.client import AsyncModbusTcpClient
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-BASELINE_REF = "v1.0.2"
 STATIC_PORT = 5021
 LIVE_PORT = 5022
 
 logging.basicConfig(level=logging.WARNING)
 log = logging.getLogger("hub_test")
 log.setLevel(logging.INFO)
+
+# Repair issues raised through the stubbed issue registry, by issue id.
+ISSUES = {}
+
+# Socket values in the Alfen Modbus register map, in register order: the
+# FLOAT32 values fill 306-361 and the FLOAT64 energy totals fill 362-425.
+FLOAT32_KEYS = [
+    "VL1-N", "VL2-N", "VL3-N", "VL1-L2", "VL2-L3", "VL3-L1",
+    "currentN", "currentL1", "currentL2", "currentL3", "currentSum",
+    "powerL1", "powerL2", "powerL3", "powerSum", "frequency",
+    "realPowerL1", "realPowerL2", "realPowerL3", "realPowerSum",
+    "apparantPowerL1", "apparantPowerL2", "apparantPowerL3", "apparantPowerSum",
+    "reactivePowerL1", "reactivePowerL2", "reactivePowerL3", "reactivePowerSum",
+]
+FLOAT64_KEYS = [
+    f"{kind}{phase}"
+    for kind in ("realEnergyDelivered", "realEnergyConsumed", "apparantEnergy", "reactiveEnergy")
+    for phase in ("L1", "L2", "L3", "Sum")
+]
+REGISTER_MAP = (
+    [(key, 306 + 2 * i, 2) for i, key in enumerate(FLOAT32_KEYS)]
+    + [(key, 362 + 4 * i, 4) for i, key in enumerate(FLOAT64_KEYS)]
+)
 
 
 # ============================================================================
@@ -68,6 +89,9 @@ def install_ha_stubs():
     core = types.ModuleType("homeassistant.core")
     core.callback = lambda func: func
     core.HomeAssistant = type("HomeAssistant", (), {})
+
+    exceptions = types.ModuleType("homeassistant.exceptions")
+    exceptions.ConfigEntryNotReady = type("ConfigEntryNotReady", (Exception,), {})
 
     entries = types.ModuleType("homeassistant.config_entries")
     entries.ConfigEntry = type("ConfigEntry", (), {})
@@ -95,21 +119,29 @@ def install_ha_stubs():
         async def ticker():
             while True:
                 await asyncio.sleep(interval.total_seconds())
-                asyncio.get_running_loop().create_task(action(dt.datetime.now()))
+                asyncio.get_running_loop().create_task(action(dt.datetime.now(dt.UTC)))
 
         task = asyncio.get_running_loop().create_task(ticker())
         return task.cancel
 
     event.async_track_time_interval = async_track_time_interval
 
+    issues = types.ModuleType("homeassistant.helpers.issue_registry")
+    issues.IssueSeverity = types.SimpleNamespace(WARNING="warning")
+    issues.async_create_issue = lambda hass, domain, issue_id, **kwargs: ISSUES.__setitem__(issue_id, kwargs)
+    issues.async_delete_issue = lambda hass, domain, issue_id: ISSUES.pop(issue_id, None)
+    helpers.issue_registry = issues
+
     sys.modules.update({
         "homeassistant": ha,
         "homeassistant.const": const,
         "homeassistant.core": core,
+        "homeassistant.exceptions": exceptions,
         "homeassistant.config_entries": entries,
         "homeassistant.helpers": helpers,
         "homeassistant.helpers.config_validation": cv,
         "homeassistant.helpers.event": event,
+        "homeassistant.helpers.issue_registry": issues,
     })
 
 
@@ -155,22 +187,6 @@ class Results:
             log.error(f"  FAIL  {name} {detail}")
 
 
-def load_old_package():
-    """Load the BASELINE_REF version of the integration as package 'alfen_modbus_old'."""
-    root = tempfile.mkdtemp(prefix="alfen_old_")
-    pkg = os.path.join(root, "alfen_modbus_old")
-    os.makedirs(pkg)
-    for name in ("__init__.py", "const.py"):
-        source = subprocess.run(
-            ["git", "-C", REPO, "show", f"{BASELINE_REF}:custom_components/alfen_modbus/{name}"],
-            capture_output=True, check=True,
-        ).stdout
-        with open(os.path.join(pkg, name), "wb") as f:
-            f.write(source)
-    sys.path.insert(0, root)
-    return importlib.import_module("alfen_modbus_old")
-
-
 def record_reads(hub):
     """Wrap hub.read_holding_registers to log (unit, address, count) per call."""
     calls = []
@@ -184,9 +200,32 @@ def record_reads(hub):
     return calls
 
 
+_entry_ids = itertools.count(1)
+
+
+def make_entry(**data):
+    """A config entry as async_setup_entry sees it."""
+    return types.SimpleNamespace(entry_id=f"entry{next(_entry_ids)}", data=data, runtime_data=None)
+
+
 def float_registers(value):
     raw = struct.pack(">f", float(value))
     return [int.from_bytes(raw[0:2], "big"), int.from_bytes(raw[2:4], "big")]
+
+
+def string_registers(text, length_bytes):
+    raw = text.encode("utf-8")[:length_bytes].ljust(length_bytes, b"\x00")
+    return [int.from_bytes(raw[i:i + 2], "big") for i in range(0, length_bytes, 2)]
+
+
+def uint64_registers(value):
+    raw = struct.pack(">Q", int(value))
+    return [int.from_bytes(raw[i:i + 2], "big") for i in range(0, 8, 2)]
+
+
+def decode_registers(registers):
+    raw = b"".join(int(r).to_bytes(2, "big") for r in registers)
+    return struct.unpack(">f" if len(raw) == 4 else ">d", raw)[0]
 
 
 def start_simulator(port, static):
@@ -219,46 +258,45 @@ async def sim_write(port, unit, address, registers):
     client.close()
 
 
+async def sim_read(port, unit, address, count):
+    client = AsyncModbusTcpClient("127.0.0.1", port=port)
+    await client.connect()
+    result = await client.read_holding_registers(address, count=count, device_id=unit)
+    client.close()
+    return result.registers
+
+
 # ============================================================================
 # Tests
 # ============================================================================
 
-async def test_decode_regression(new_mod, old_mod, hass, results):
-    log.info("\n=== Decodes against the previous release (static simulator) ===")
-    old_hub = old_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30)
-    new_hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30)
-    for hub in (old_hub, new_hub):
-        await hass.async_add_executor_job(hub.connect)
-        await hub.read_modbus_data()
-        hub.close()
+async def test_register_map(new_mod, hass, results):
+    log.info("\n=== Decodes against the register map (static simulator) ===")
+    hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30)
+    await hub.read_modbus_data()
+    hub._client.close()
 
-    # v1.0.2 stored apparent power and energy under "apparant" keys, which the
-    # sensors never read.
-    renamed = sorted(k for k in old_hub.data if "_apparant" in k)
-    old_data = {k.replace("_apparant", "_apparent"): v for k, v in old_hub.data.items()}
-    results.check("apparent power and energy keys renamed from 'apparant' (8 per socket)",
-                  len(renamed) == 8 and not any("_apparant" in k for k in new_hub.data), f"renamed={renamed}")
-
-    only_old = sorted(set(old_data) - set(new_hub.data))
-    only_new = sorted(set(new_hub.data) - set(old_data))
-    differ = sorted(k for k in set(old_data) & set(new_hub.data) if old_data[k] != new_hub.data[k])
-    results.check("same set of data keys", not only_old and not only_new, f"old-only={only_old} new-only={only_new}")
-    results.check("only the meter reading age and session duration differ",
-                  differ == ["socket_1_currentSessionDuration", "socket_1_meterAge"], f"differ={differ}")
-    log.info(f"        {len(old_hub.data)} keys compared")
-    log.info(f"        meter age: old {old_hub.data.get('socket_1_meterAge')!r} -> new {new_hub.data.get('socket_1_meterAge')!r}")
-    results.check("meter age is one value in seconds (500 ms -> 0.5)", new_hub.data.get("socket_1_meterAge") == 0.5)
-    old_duration = old_hub.data.get("socket_1_currentSessionDuration")
-    new_duration = new_hub.data.get("socket_1_currentSessionDuration")
-    results.check("session duration is whole seconds, not a timedelta",
-                  isinstance(new_duration, int) and new_duration == int(old_duration.total_seconds()),
-                  f"old {old_duration!r} -> new {new_duration!r}")
+    wrong = []
+    for key, address, count in REGISTER_MAP:
+        expected = decode_registers(await sim_read(STATIC_PORT, 1, address, count))
+        got = hub.data.get(f"socket_1_{key}")
+        if got is None or abs(got - expected) > 0.006:
+            wrong.append(f"{key}@{address}: hub {got!r}, register {expected!r}")
+    results.check(f"all {len(REGISTER_MAP)} socket values decode from their register", not wrong, "; ".join(wrong))
+    results.check("apparent energy L1 comes from 394, after real energy consumed sum (390-393)",
+                  hub.data.get("socket_1_apparantEnergyL1") == 15542.0, f"got {hub.data.get('socket_1_apparantEnergyL1')!r}")
+    results.check("reactive energy sum comes from 422-425",
+                  hub.data.get("socket_1_reactiveEnergySum") == 9169.0, f"got {hub.data.get('socket_1_reactiveEnergySum')!r}")
+    results.check("meter age is one value in seconds (500 ms -> 0.5)", hub.data.get("socket_1_meterAge") == 0.5)
+    duration = hub.data.get("socket_1_currentSessionDuration")
+    results.check("session duration is whole seconds, not a timedelta", isinstance(duration, int), f"got {duration!r}")
+    results.check("usable phases use the select's literal option", hub.data.get("usephases_S1") == "3",
+                  f"got {hub.data.get('usephases_S1')!r}")
 
 
 async def test_request_plan(new_mod, hass, results):
     log.info("\n=== Registers requested per read ===")
     hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30, measurement_interval=2)
-    await hass.async_add_executor_job(hub.connect)
     calls = record_reads(hub)
 
     await hub.read_modbus_data()
@@ -269,22 +307,21 @@ async def test_request_plan(new_mod, hass, results):
     calls.clear()
     await hub.read_modbus_data_slow()
     slow = list(calls)
-    hub.close()
+    hub._client.close()
 
     results.check("full read: identification once, then slow, then measurements",
-                  full == [(200, 100, 68), (200, 168, 11), (200, 1100, 6), (1, 346, 79), (1, 300, 46), (1, 1200, 16)],
+                  full == [(200, 100, 68), (200, 168, 11), (200, 1100, 6), (1, 346, 80), (1, 300, 46), (1, 1200, 16)],
                   f"got {full}")
     results.check("measurement read: 300-345 and 1200-1215 only", measurement == [(1, 300, 46), (1, 1200, 16)], f"got {measurement}")
-    results.check("slow read: clock, station, totals (no identification)",
-                  slow == [(200, 168, 11), (200, 1100, 6), (1, 346, 79)], f"got {slow}")
-    log.info(f"        measurement read: {sum(c for _, _, c in measurement)} registers in {len(measurement)} requests "
-             f"(previous release: 226 in 5 every scan)")
+    results.check("slow read: clock, station, totals 346-425 (no identification)",
+                  slow == [(200, 168, 11), (200, 1100, 6), (1, 346, 80)], f"got {slow}")
+    results.check("no request above the 125-register limit", all(c <= 125 for _, _, c in full + slow))
+    log.info(f"        measurement read: {sum(c for _, _, c in measurement)} registers in {len(measurement)} requests")
 
 
 async def test_timers_and_writes(new_mod, hass, results):
     log.info("\n=== Timers, write refresh, busy guard (live simulator) ===")
     hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", LIVE_PORT, 200, 4, measurement_interval=1)
-    await hass.async_add_executor_job(hub.connect)
     calls = record_reads(hub)
     notified = []
     max_current_refreshes = []
@@ -294,7 +331,7 @@ async def test_timers_and_writes(new_mod, hass, results):
     start = time.time()
     while time.time() - start < 12:
         await asyncio.sleep(0.25)
-        if "socket_1_meterAge" in hub.data:
+        if hub.data.get("socket_1_meterAge") is not None:
             ages.append(hub.data["socket_1_meterAge"])
     count = lambda address: sum(1 for _, a, _ in calls if a == address)
     log.info(f"        12 s: measurement reads {count(300)}, slow reads {count(346)}, identification reads {count(100)}")
@@ -329,7 +366,7 @@ async def test_timers_and_writes(new_mod, hass, results):
     # Busy guard: a timer tick is dropped while a read runs; a write refresh is not.
     calls.clear()
     hub._measurement_busy = True
-    await hub.async_refresh_modbus_data(dt.datetime.now())
+    await hub.async_refresh_modbus_data(dt.datetime.now(dt.UTC))
     dropped = len(calls)
     await hub.async_refresh_modbus_data()
     after_write = len(calls)
@@ -347,9 +384,83 @@ async def test_timers_and_writes(new_mod, hass, results):
     await sim_write(LIVE_PORT, 1, 1208, [0, 60])
 
     results.check("entities notified after reads", len(notified) >= 10, f"{len(notified)} notifications")
-    for unsub in (hub._unsub_interval_method, hub._unsub_measurement_method):
-        unsub()
-    hub.close()
+
+    # Removing the last entity stops both timers and closes the connection;
+    # a read that arrives after that does not reopen it.
+    hub.async_remove_alfen_sensor(hub._sensors[0], hub._inputs[0])
+    await asyncio.sleep(0.2)
+    calls.clear()
+    late = await hub.read_holding_registers(1, 300, 46)
+    results.check("no read after the last entity is removed",
+                  late is None and await hub.read_modbus_data() is False and not hub._client.connected,
+                  f"result {late!r}, connected {hub._client.connected}")
+
+
+async def test_socket_state(new_mod, hass, results):
+    log.info("\n=== Mode 3 state, session, charger enabled, meter age (static simulator) ===")
+    hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30)
+    await hub.read_modbus_data()
+
+    async def set_mode3(state):
+        await sim_write(STATIC_PORT, 1, 1201, string_registers(state, 10))
+        await hub.read_modbus_data_measurements()
+        return hub.data["socket_1_carconnected"], hub.data["socket_1_carcharging"]
+
+    try:
+        cases = [("A", 0, 0), ("A1", 0, 0), ("B1", 1, 0), ("B2", 1, 0), ("C1", 1, 0), ("C2", 1, 1),
+                 ("D1", 1, 0), ("D2", 1, 1), ("E", 0, 0), ("F", 0, 0), ("", 0, 0), ("c2", 1, 1)]
+        wrong = []
+        for state, connected, charging in cases:
+            got = await set_mode3(state)
+            if got != (connected, charging):
+                wrong.append(f"{state!r}: got {got}, expected {(connected, charging)}")
+        results.check("car connected/charging per Mode 3 state family", not wrong, "; ".join(wrong))
+
+        # The session runs from plug-in to unplug: a pause in charging keeps it.
+        await set_mode3("A")
+        await set_mode3("B1")
+        start = hub.data.get("socket_1_chargingStart")
+        for state in ("C2", "C1", "C2"):
+            await set_mode3(state)
+        results.check("session start set at plug-in and kept across a charging pause",
+                      start is not None and hub.data.get("socket_1_chargingStart") is start)
+        await set_mode3("A")
+        results.check("session start cleared at unplug", "socket_1_chargingStart" not in hub.data)
+
+        await sim_write(STATIC_PORT, 1, 1210, float_registers(0.0))
+        await hub.read_modbus_data_measurements()
+        disabled = hub.data["socket_1_chargerenabled"]
+        await sim_write(STATIC_PORT, 1, 1210, float_registers(16.0))
+        await hub.read_modbus_data_measurements()
+        results.check("charger enabled follows the max current setpoint (0 A -> off)",
+                      disabled == 0 and hub.data["socket_1_chargerenabled"] == 1)
+
+        await sim_write(STATIC_PORT, 1, 301, uint64_registers(0xFFFFFFFFFFFFFFFF))
+        await hub.read_modbus_data_measurements()
+        results.check("meter age 'not available' (all ones) reads as unknown", hub.data["socket_1_meterAge"] is None,
+                      f"got {hub.data['socket_1_meterAge']!r}")
+    finally:
+        await sim_write(STATIC_PORT, 1, 1201, string_registers("C2", 10))
+        await sim_write(STATIC_PORT, 1, 1210, float_registers(16.0))
+        await sim_write(STATIC_PORT, 1, 301, uint64_registers(500))
+        hub._client.close()
+
+
+def test_firmware_repair(new_mod, results):
+    log.info("\n=== Outdated NG9xx firmware repair issue ===")
+    repairs = importlib.import_module("custom_components.alfen_modbus.repairs")
+    issue = "ng9xx_firmware_outdated_e1"
+    cases = [("NG910", "5.16.0-4095", True), ("NG910", "6.4.0-4210", False), ("NG910", "7.0.1-1000", False),
+             ("NG910", "unknown", True), ("AHP02-60227", "2.6.0", False)]
+    wrong = []
+    for platform, firmware, expected in cases:
+        repairs.async_check_firmware(None, "e1", platform, firmware)
+        if (issue in ISSUES) != expected:
+            wrong.append(f"{platform} {firmware}: issue {issue in ISSUES}")
+    results.check("issue raised for NG9xx below 6.4.0 only", not wrong, "; ".join(wrong))
+    repairs.async_check_firmware(None, "e1", "NG910", "5.16.0-4095")
+    repairs.async_clear_firmware_issue(None, "e1")
+    results.check("issue removed on unload", issue not in ISSUES)
 
 
 async def test_setup_entry_intervals(new_mod, hass, results):
@@ -361,15 +472,14 @@ async def test_setup_entry_intervals(new_mod, hass, results):
         ("measurement above scan is capped", {"measurement_interval": 60}, 20),
     ]
     for label, extra, expected in cases:
-        name = "alfen_" + str(len(hass.data[new_mod.DOMAIN]))
-        entry = types.SimpleNamespace(data={"host": "127.0.0.1", "name": name, "port": STATIC_PORT,
-                                            "modbus_address": 200, "scan_interval": 20, **extra})
+        entry = make_entry(host="127.0.0.1", name="alfen", port=STATIC_PORT,
+                           modbus_address=200, scan_interval=20, **extra)
         await new_mod.async_setup_entry(hass, entry)
-        hub = hass.data[new_mod.DOMAIN][name]["hub"]
+        hub = entry.runtime_data
         got = hub._measurement_interval.total_seconds()
         results.check(f"{label}: {expected} s", got == expected, f"got {got}")
         results.check(f"{label}: scan stays 20 s", hub._scan_interval.total_seconds() == 20)
-        hub.close()
+        hub._client.close()
 
 
 async def test_identification_on_setup_and_reload(new_mod, hass, results):
@@ -385,22 +495,20 @@ async def test_identification_on_setup_and_reload(new_mod, hass, results):
     new_mod.AlfenModbusHub.read_holding_registers = recording
     try:
         await new_mod.async_setup(hass, {})
-        entry = types.SimpleNamespace(data={"host": "127.0.0.1", "name": "alfen_reload", "port": STATIC_PORT,
-                                            "modbus_address": 200, "scan_interval": 20,
-                                            "measurement_interval": 2})
+        entry = make_entry(host="127.0.0.1", name="alfen_reload", port=STATIC_PORT,
+                           modbus_address=200, scan_interval=20, measurement_interval=2)
         # HA startup: the entry is set up.
         await new_mod.async_setup_entry(hass, entry)
-        first_hub = hass.data[new_mod.DOMAIN]["alfen_reload"]["hub"]
+        first_hub = entry.runtime_data
         after_startup = calls.count((200, 100, 68))
         # Integration reload (also after an options change): unload, then set up again.
         await new_mod.async_unload_entry(hass, entry)
-        first_hub.close()
-        hass.data[new_mod.DOMAIN].pop("alfen_reload", None)
+        first_hub._client.close()
         first_hub.data.clear()
         await new_mod.async_setup_entry(hass, entry)
-        second_hub = hass.data[new_mod.DOMAIN]["alfen_reload"]["hub"]
+        second_hub = entry.runtime_data
         after_reload = calls.count((200, 100, 68))
-        second_hub.close()
+        second_hub._client.close()
     finally:
         new_mod.AlfenModbusHub.read_holding_registers = original
 
@@ -409,22 +517,15 @@ async def test_identification_on_setup_and_reload(new_mod, hass, results):
     results.check("reload builds a new hub with the identification filled in",
                   second_hub is not first_hub and second_hub.data.get("serial") and second_hub.data.get("firmwareVersion"),
                   f"serial={second_hub.data.get('serial')!r} firmware={second_hub.data.get('firmwareVersion')!r}")
-
-
-def string_registers(text, length_bytes):
-    raw = text.encode("utf-8")[:length_bytes].ljust(length_bytes, b"\x00")
-    return [int.from_bytes(raw[i:i + 2], "big") for i in range(0, length_bytes, 2)]
-
-
-def uint64_registers(value):
-    raw = struct.pack(">Q", int(value))
-    return [int.from_bytes(raw[i:i + 2], "big") for i in range(0, 8, 2)]
+    platform = second_hub.data.get("platformType", "")
+    results.check("firmware repair issue matches the simulated charger",
+                  (f"ng9xx_firmware_outdated_{entry.entry_id}" in ISSUES) == ("NG9" in platform.upper()),
+                  f"platform {platform!r}, issues {sorted(ISSUES)}")
 
 
 async def test_identification_after_charger_restart(new_mod, hass, results):
     log.info("\n=== Identification after a charger restart (uptime goes back) ===")
     hub = new_mod.AlfenModbusHub(hass, "alfen", "127.0.0.1", STATIC_PORT, 200, 30, measurement_interval=2)
-    await hass.async_add_executor_job(hub.connect)
     await hub.read_modbus_data()
     old_firmware = hub.data["firmwareVersion"]
     calls = record_reads(hub)
@@ -466,7 +567,7 @@ async def test_identification_after_charger_restart(new_mod, hass, results):
     finally:
         await sim_write(STATIC_PORT, 200, 123, string_registers("5.16.0-4095", 34))
         await sim_write(STATIC_PORT, 200, 174, uint64_registers(3600000))
-        hub.close()
+        hub._client.close()
 
 
 def test_config_schema(results):
@@ -487,7 +588,6 @@ async def main():
     install_ha_stubs()
     sys.path.insert(0, REPO)
     new_mod = importlib.import_module("custom_components.alfen_modbus")
-    old_mod = load_old_package()
 
     sims = [start_simulator(STATIC_PORT, True), start_simulator(LIVE_PORT, False)]
     results = Results()
@@ -497,9 +597,11 @@ async def main():
             log.error("Simulators did not start")
             return 1
         hass = FakeHass()
-        await test_decode_regression(new_mod, old_mod, hass, results)
+        await test_register_map(new_mod, hass, results)
         await test_request_plan(new_mod, hass, results)
         await test_timers_and_writes(new_mod, hass, results)
+        await test_socket_state(new_mod, hass, results)
+        test_firmware_repair(new_mod, results)
         await test_setup_entry_intervals(new_mod, hass, results)
         await test_identification_on_setup_and_reload(new_mod, hass, results)
         await test_identification_after_charger_restart(new_mod, hass, results)
