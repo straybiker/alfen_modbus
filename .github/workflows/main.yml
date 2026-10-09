@@ -33,9 +33,12 @@ jobs:
           - homeassistant: "2025.10.0"
             pymodbus: "3.11.2"
             python: "3.13"
+            # Core pins aiodns 3.5.0 but not pycares; pycares 5 breaks that aiodns.
+            extra: "pycares<5"
           - homeassistant: "2026.9.4"
             pymodbus: "3.13.1"
             python: "3.14"
+            extra: ""
     steps:
       - uses: "actions/checkout@v4"
         with:
@@ -48,7 +51,7 @@ jobs:
           python -m venv sim-venv
           sim-venv/bin/pip install -r simulator/requirements.txt
       - name: Install the integration dependencies
-        run: pip install "homeassistant==${{ matrix.homeassistant }}" "pymodbus==${{ matrix.pymodbus }}" voluptuous python-dateutil
+        run: pip install "homeassistant==${{ matrix.homeassistant }}" "pymodbus==${{ matrix.pymodbus }}" voluptuous python-dateutil ${{ matrix.extra && format('"{0}"', matrix.extra) || '' }}
       - name: Run hub polling tests
         run: python simulator/test_hub_polling.py
         env:
