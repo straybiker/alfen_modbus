@@ -3,8 +3,10 @@ Tests the real AlfenModbusHub (custom_components/alfen_modbus) against the
 simulator, with the few Home Assistant imports stubbed out.
 
 Covers the split into a measurement interval and a scan interval:
-  - decodes are unchanged against the previous release (git HEAD), except the
-    meter reading age, which is now one UINT64 in seconds
+  - decodes are unchanged against the previous release (git tag v1.0.2), except the
+    meter reading age, which is now one UINT64 in seconds, the session
+    duration, which is now whole seconds instead of a timedelta, and the
+    apparent power and energy keys, which were spelled "apparant"
   - which registers each kind of read requests
   - timer rates, the write-triggered refresh, the busy guard and the
     max current refresh
@@ -20,7 +22,8 @@ Usage:
         hub with a pymodbus version that the simulator does not support
 
 Requires pymodbus >= 3.11.2, voluptuous and python-dateutil. Run it from a
-checkout that is a git repository (the comparison loads the HEAD version).
+checkout that is a git repository with its tags (the comparison loads the
+v1.0.2 version).
 """
 import asyncio
 import datetime as dt
@@ -40,6 +43,7 @@ from pymodbus.client import AsyncModbusTcpClient
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+BASELINE_REF = "v1.0.2"
 STATIC_PORT = 5021
 LIVE_PORT = 5022
 
@@ -152,13 +156,13 @@ class Results:
 
 
 def load_old_package():
-    """Load the HEAD version of the integration as package 'alfen_modbus_old'."""
+    """Load the BASELINE_REF version of the integration as package 'alfen_modbus_old'."""
     root = tempfile.mkdtemp(prefix="alfen_old_")
     pkg = os.path.join(root, "alfen_modbus_old")
     os.makedirs(pkg)
     for name in ("__init__.py", "const.py"):
         source = subprocess.run(
-            ["git", "-C", REPO, "show", f"HEAD:custom_components/alfen_modbus/{name}"],
+            ["git", "-C", REPO, "show", f"{BASELINE_REF}:custom_components/alfen_modbus/{name}"],
             capture_output=True, check=True,
         ).stdout
         with open(os.path.join(pkg, name), "wb") as f:
@@ -228,14 +232,27 @@ async def test_decode_regression(new_mod, old_mod, hass, results):
         await hub.read_modbus_data()
         hub.close()
 
-    only_old = sorted(set(old_hub.data) - set(new_hub.data))
-    only_new = sorted(set(new_hub.data) - set(old_hub.data))
-    differ = sorted(k for k in set(old_hub.data) & set(new_hub.data) if old_hub.data[k] != new_hub.data[k])
+    # v1.0.2 stored apparent power and energy under "apparant" keys, which the
+    # sensors never read.
+    renamed = sorted(k for k in old_hub.data if "_apparant" in k)
+    old_data = {k.replace("_apparant", "_apparent"): v for k, v in old_hub.data.items()}
+    results.check("apparent power and energy keys renamed from 'apparant' (8 per socket)",
+                  len(renamed) == 8 and not any("_apparant" in k for k in new_hub.data), f"renamed={renamed}")
+
+    only_old = sorted(set(old_data) - set(new_hub.data))
+    only_new = sorted(set(new_hub.data) - set(old_data))
+    differ = sorted(k for k in set(old_data) & set(new_hub.data) if old_data[k] != new_hub.data[k])
     results.check("same set of data keys", not only_old and not only_new, f"old-only={only_old} new-only={only_new}")
-    results.check("only the meter reading age differs", differ == ["socket_1_meterAge"], f"differ={differ}")
+    results.check("only the meter reading age and session duration differ",
+                  differ == ["socket_1_currentSessionDuration", "socket_1_meterAge"], f"differ={differ}")
     log.info(f"        {len(old_hub.data)} keys compared")
     log.info(f"        meter age: old {old_hub.data.get('socket_1_meterAge')!r} -> new {new_hub.data.get('socket_1_meterAge')!r}")
     results.check("meter age is one value in seconds (500 ms -> 0.5)", new_hub.data.get("socket_1_meterAge") == 0.5)
+    old_duration = old_hub.data.get("socket_1_currentSessionDuration")
+    new_duration = new_hub.data.get("socket_1_currentSessionDuration")
+    results.check("session duration is whole seconds, not a timedelta",
+                  isinstance(new_duration, int) and new_duration == int(old_duration.total_seconds()),
+                  f"old {old_duration!r} -> new {new_duration!r}")
 
 
 async def test_request_plan(new_mod, hass, results):
@@ -287,7 +304,11 @@ async def test_timers_and_writes(new_mod, hass, results):
     results.check("meter age always under 1 s and changing", ages and max(ages) < 1 and len(set(ages)) > 3,
                   f"values {sorted(set(ages))[:6]}")
 
-    # A write is followed by a measurement-only refresh.
+    # A write is followed by a measurement-only refresh. Stop the scan timer
+    # first: its own reads would otherwise land in this check at random.
+    hub._unsub_interval_method()
+    hub._unsub_interval_method = lambda: None
+    await asyncio.sleep(0.5)
     calls.clear()
     payload = float_registers(10.0)
     await hub.write_registers(unit=1, address=1210, payload=payload)
