@@ -116,6 +116,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
+### Unreleased
+
+- **Device classes** - Every sensor with a unit now has a Home Assistant device class (current, voltage, frequency, power, apparent power, reactive power, energy, reactive energy, duration, temperature), and the power factor sensors have the power factor class. Entity selectors that filter on device class now list these sensors. Apparent energy (VAh) has no device class, because Home Assistant has none for it
+- **Reactive units** - Reactive power is now in `var` (was `VAr`) and reactive energy in `varh` (was `VAh`, which was wrong). Home Assistant flags the unit change for existing statistics: fix it in **Developer tools > Statistics**
+- **Session duration** - Now a number of seconds (it showed a time such as `0:12:34` with unit `s`)
+- **State classes** - Energy counters are totals; text, on/off and settings sensors (name, firmware, mode 3 state, number of sockets, ...) no longer have a state class and no longer go into long-term statistics
+
 ### v1.1.0
 
 - **Measurement interval** - Power, current, voltage and charger state can be polled faster than the energy totals, for load balancing

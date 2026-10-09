@@ -574,7 +574,7 @@ class AlfenModbusHub:
             return
         if s+"realEnergyDeliveredSum" in self.data and "stationTime" in self.data:
             self.data[s+"currentSession"] = self.data[s+"realEnergyDeliveredSum"] - start_wh
-            self.data[s+"currentSessionDuration"] = self.data["stationTime"] - start
+            self.data[s+"currentSessionDuration"] = int((self.data["stationTime"] - start).total_seconds())
 
 
     async def read_modbus_data_product(self):

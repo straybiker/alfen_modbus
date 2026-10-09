@@ -4,7 +4,8 @@ simulator, with the few Home Assistant imports stubbed out.
 
 Covers the split into a measurement interval and a scan interval:
   - decodes are unchanged against the previous release (git tag v1.0.2), except the
-    meter reading age, which is now one UINT64 in seconds
+    meter reading age, which is now one UINT64 in seconds, and the session
+    duration, which is now whole seconds instead of a timedelta
   - which registers each kind of read requests
   - timer rates, the write-triggered refresh, the busy guard and the
     max current refresh
@@ -234,10 +235,16 @@ async def test_decode_regression(new_mod, old_mod, hass, results):
     only_new = sorted(set(new_hub.data) - set(old_hub.data))
     differ = sorted(k for k in set(old_hub.data) & set(new_hub.data) if old_hub.data[k] != new_hub.data[k])
     results.check("same set of data keys", not only_old and not only_new, f"old-only={only_old} new-only={only_new}")
-    results.check("only the meter reading age differs", differ == ["socket_1_meterAge"], f"differ={differ}")
+    results.check("only the meter reading age and session duration differ",
+                  differ == ["socket_1_currentSessionDuration", "socket_1_meterAge"], f"differ={differ}")
     log.info(f"        {len(old_hub.data)} keys compared")
     log.info(f"        meter age: old {old_hub.data.get('socket_1_meterAge')!r} -> new {new_hub.data.get('socket_1_meterAge')!r}")
     results.check("meter age is one value in seconds (500 ms -> 0.5)", new_hub.data.get("socket_1_meterAge") == 0.5)
+    old_duration = old_hub.data.get("socket_1_currentSessionDuration")
+    new_duration = new_hub.data.get("socket_1_currentSessionDuration")
+    results.check("session duration is whole seconds, not a timedelta",
+                  isinstance(new_duration, int) and new_duration == int(old_duration.total_seconds()),
+                  f"old {old_duration!r} -> new {new_duration!r}")
 
 
 async def test_request_plan(new_mod, hass, results):
