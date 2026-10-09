@@ -173,7 +173,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **Car connected and charging** - Mode 3 states are matched by family (`A1`, `B1`, ... are recognised), and the session runs from plug-in to unplug, so a short charging pause no longer starts a new session. Only state A (no car) ends a session: the short E state that Alfen reports at the end of a charge no longer resets it (beta.2)
 - **Session duration** - Now a number of seconds (it showed a time such as `0:12:34` with unit `s`)
 - **State classes** - Energy counters are totals; text, on/off and settings sensors (name, firmware, mode 3 state, number of sockets, ...) no longer have a state class and no longer go into long-term statistics
-- **Breaking changes** - The Phase Mode select options are now `"1"` and `"3"` (were `"1 Phase"` and `"3 Phases"`). The Backoffice connected, Car connected, Car charging and Received SP accounted for sensors report `on`/`off` (were `True`/`False`). Update automations and templates that compare with the old values
+- **Breaking changes** - Check automations, scripts, templates and dashboards that use these entities:
+  1. **Phase Mode select** (`select.*_usable_phases*`): the options are `1` and `3` (were `1 Phase` and `3 Phases`). A `select.select_option` call with the old text fails. The **Charging mode** sensor still shows `1 Phase` / `3 Phases`.
+  2. **Backoffice connected, Car connected, Car charging and Received SP accounted for sensors**: they report `on` / `off` (were `True` / `False`). The binary sensors for car connected and car charging are unchanged.
+  3. **Current session duration**: a number of seconds (was text such as `0:12:34`).
+  4. **Current session Wh and duration**: they count from plug-in to unplug, including charging pauses and the time the car is connected without charging. They counted from the start of charging and restarted after each charging pause. Only unplug (Mode 3 state `A`) ends a session.
+  5. **Car connected**: Mode 3 states are matched by family. `A1` and an empty state now read as not connected (they read as connected). `E` and `F` read as not connected, as before.
+  6. **Entity names**: they come from translations and follow the Home Assistant language. Some friendly names change, for example "Usable phases1" becomes "Usable phases". Entity IDs of existing entities do not change. A new installation gets entity IDs from the new names.
+  7. **Apparent power and apparent energy sensors**: they use their original unique IDs again (`<name>_socket_1_apparantPowerL1` and so on). Installations that started on v1.0.0 or v1.0.1 get their original entities back; if you disabled those, enable them again. The entities of v1.0.2 to v1.1.0 never had values and stay behind as orphans: delete them in **Settings → Entities**.
+  8. **Long-term statistics**: reactive power is in `var` (was `VAr`) and reactive energy in `varh` (was `VAh`). Number of sockets, Number of SCN sockets and Modbus table version no longer have a state class. **Developer tools → Statistics** shows a notice for each: accept the new unit or delete the old statistics.
 
 ### v1.1.0
 
