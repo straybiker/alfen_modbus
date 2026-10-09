@@ -113,6 +113,8 @@ class AlfenSensor(SensorEntity):
             self._attr_device_class = SensorDeviceClass.ENERGY
         if self._unit_of_measurement == UnitOfPower.WATT :
             self._attr_device_class = SensorDeviceClass.POWER
+        if self._unit_of_measurement == UnitOfElectricCurrent.A :
+            self._attr_device_class = SensorDeviceClass.CURRENT            
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks."""
