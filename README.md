@@ -163,14 +163,14 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
-### v1.2.0 (beta)
+### v1.2.0
 
 - **Merged with ThaStealth/alfen_modbus 0.3.0-beta.1** - Translated entity names (8 languages), EVCC support with a Charger Enabled switch, the full SCN register block, diagnostics download, a repair notice for outdated NG9xx firmware, and a more robust Modbus connection. See the breaking changes below
 - **Device classes** - Every sensor with a unit now has a Home Assistant device class (current, voltage, frequency, power, apparent power, reactive power, energy, reactive energy, duration, temperature), and the power factor sensors have the power factor class. Entity selectors that filter on device class now list these sensors. Apparent energy (VAh) has no device class, because Home Assistant has none for it
 - **Energy registers** - Apparent and reactive energy were read 2 registers too early, so their values were wrong. They now follow the register map (394-425)
 - **Apparent power and energy** - These sensors now show values. Their unique IDs are the original ones again (`..._apparantPowerL1` and so on): entities created by v1.0.2 to v1.1.0 never had values and stay behind as orphans, which you can delete
 - **Reactive units** - Reactive power is now in `var` (was `VAr`) and reactive energy in `varh` (was `VAh`, which was wrong). Home Assistant flags the unit change for existing statistics: fix it in **Developer tools > Statistics**
-- **Car connected and charging** - Mode 3 states are matched by family (`A1`, `B1`, ... are recognised), and the session runs from plug-in to unplug, so a short charging pause no longer starts a new session. Only state A (no car) ends a session: the short E state that Alfen reports at the end of a charge no longer resets it (beta.2)
+- **Car connected and charging** - Mode 3 states are matched by family (`A1`, `B1`, ... are recognised), and the session runs from plug-in to unplug, so a short charging pause no longer starts a new session. Only state A (no car) ends a session: the short E state that Alfen reports at the end of a charge no longer resets it
 - **Session duration** - Now a number of seconds (it showed a time such as `0:12:34` with unit `s`)
 - **State classes** - Energy counters are totals; text, on/off and settings sensors (name, firmware, mode 3 state, number of sockets, ...) no longer have a state class and no longer go into long-term statistics
 - **Breaking changes** - Check automations, scripts, templates and dashboards that use these entities:
