@@ -165,6 +165,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
+### v1.2.1 (beta)
+
+- **Merged with ThaStealth/alfen_modbus 0.3.0-beta.4** - Maintenance changes only
+- **No YAML configuration** - The integration is set up in the UI only, as before. An `alfen_modbus:` entry in `configuration.yaml` was always ignored; Home Assistant now shows a repair notice for it. Remove the entry
+- **Deprecated API** - The config flow no longer uses the deprecated `CONNECTION_CLASS`
+- **EVCC guide** - Entity IDs depend on the Home Assistant language. The guide now says so and shows how to find them
+
 ### v1.2.0
 
 - **Merged with ThaStealth/alfen_modbus 0.3.0-beta.1** - Translated entity names (8 languages), EVCC support with a Charger Enabled switch, the full SCN register block, diagnostics download, a repair notice for outdated NG9xx firmware, and a more robust Modbus connection. See the breaking changes below
