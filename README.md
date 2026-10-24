@@ -165,7 +165,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
-### v1.2.1 (beta)
+### v1.2.1
 
 - **Merged with ThaStealth/alfen_modbus 0.3.0-beta.4** - Maintenance changes only
 - **No YAML configuration** - The integration is set up in the UI only, as before. An `alfen_modbus:` entry in `configuration.yaml` was always ignored; Home Assistant now shows a repair notice for it. Remove the entry
