@@ -11,7 +11,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v4"
-      - uses: "home-assistant/actions/hassfest@master"
+      - uses: "home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361" # master
   hacs:
     name: HACS Action
     runs-on: "ubuntu-latest"
